@@ -139,13 +139,21 @@ class BanglaSQLDataset(Dataset):
             truncation=True,
             padding=False,
         )
-        with self.tokenizer.as_target_tokenizer():
+        try:
             labels = self.tokenizer(
-                tgt,
+                text_target=tgt,
                 max_length=MAX_TARGET_LENGTH,
                 truncation=True,
                 padding=False,
             )
+        except TypeError:
+            with self.tokenizer.as_target_tokenizer():
+                labels = self.tokenizer(
+                    tgt,
+                    max_length=MAX_TARGET_LENGTH,
+                    truncation=True,
+                    padding=False,
+                )
 
         model_inputs["labels"] = labels["input_ids"]
         return model_inputs
@@ -264,19 +272,25 @@ def main():
     training_args = Seq2SeqTrainingArguments(**valid_kwargs)
 
     # Trainer
-    trainer = Seq2SeqTrainer(
-        model=model,
-        args=training_args,
-        train_dataset=train_dataset,
-        eval_dataset=dev_dataset,
-        tokenizer=tokenizer,
-        data_collator=data_collator,
-        compute_metrics=lambda p: compute_metrics(p, tokenizer),
-        callbacks=[
+    trainer_kwargs = {
+        "model": model,
+        "args": training_args,
+        "train_dataset": train_dataset,
+        "eval_dataset": dev_dataset,
+        "data_collator": data_collator,
+        "compute_metrics": lambda p: compute_metrics(p, tokenizer),
+        "callbacks": [
             EarlyStoppingCallback(early_stopping_patience=4)
-            # Stops if exact_match doesn't improve for 4 consecutive epochs
         ],
-    )
+    }
+
+    trainer_sig = inspect.signature(Seq2SeqTrainer.__init__).parameters
+    if "processing_class" in trainer_sig:
+        trainer_kwargs["processing_class"] = tokenizer
+    elif "tokenizer" in trainer_sig:
+        trainer_kwargs["tokenizer"] = tokenizer
+
+    trainer = Seq2SeqTrainer(**trainer_kwargs)
 
     # Train
     logger.info("\nStarting training...")
