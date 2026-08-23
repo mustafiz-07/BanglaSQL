@@ -105,9 +105,10 @@ MAX_TARGET_LENGTH = int(TRAIN_CONFIG["max_target_length"])
 SCHEMA_STRING     = TRAIN_CONFIG["schema_string"]
 
 # ── Hyperparameters ────────────────────────────────────────────────────────────
-BATCH_SIZE       = 8       # Batch size per device
+BATCH_SIZE       = 8       # Train batch size per device
+EVAL_BATCH_SIZE  = 16      # Eval batch size (larger for faster evaluation)
 GRAD_ACCUM_STEPS = 2       # Effective batch = BATCH_SIZE * GRAD_ACCUM_STEPS = 16
-LEARNING_RATE    = 5e-4
+LEARNING_RATE    = 2e-4    # Recommended learning rate for T5/BanglaT5 fine-tuning
 NUM_EPOCHS       = 20
 WEIGHT_DECAY     = 0.01
 SAVE_TOTAL_LIMIT = 3       # Keep only the 3 best checkpoints
@@ -282,7 +283,7 @@ def main():
         "output_dir": CHECKPOINTS,
         "num_train_epochs": NUM_EPOCHS,
         "per_device_train_batch_size": BATCH_SIZE,
-        "per_device_eval_batch_size": BATCH_SIZE,
+        "per_device_eval_batch_size": EVAL_BATCH_SIZE,
         "gradient_accumulation_steps": GRAD_ACCUM_STEPS,
         "learning_rate": LEARNING_RATE,
         "weight_decay": WEIGHT_DECAY,
@@ -297,7 +298,7 @@ def main():
         "report_to": "none",
         "seed": SEED,
         "data_seed": SEED,
-        "fp16": torch.cuda.is_available(),
+        "fp16": False,  # MUST be False: T5 architectures produce NaN overflow in standard FP16
     }
 
     # Handle evaluation strategy across all transformers versions
