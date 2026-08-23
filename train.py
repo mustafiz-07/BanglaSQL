@@ -218,41 +218,50 @@ def main():
         pad_to_multiple_of=8,
     )
 
-    # Training arguments
-    training_args = Seq2SeqTrainingArguments(
-        output_dir=CHECKPOINTS,
-        num_train_epochs=NUM_EPOCHS,
-        per_device_train_batch_size=BATCH_SIZE,
-        per_device_eval_batch_size=BATCH_SIZE,
-        gradient_accumulation_steps=GRAD_ACCUM_STEPS,
-        learning_rate=LEARNING_RATE,
-        warmup_ratio=WARMUP_RATIO,
-        weight_decay=WEIGHT_DECAY,
+    # Training arguments — construct kwargs dynamically for cross-version compatibility
+    import inspect
+    sig_params = inspect.signature(Seq2SeqTrainingArguments.__init__).parameters
 
-        # Evaluation
-        eval_strategy="epoch",
-        save_strategy="epoch",
-        load_best_model_at_end=True,
-        metric_for_best_model="exact_match",
-        greater_is_better=True,
-        save_total_limit=SAVE_TOTAL_LIMIT,
+    training_kwargs = {
+        "output_dir": CHECKPOINTS,
+        "num_train_epochs": NUM_EPOCHS,
+        "per_device_train_batch_size": BATCH_SIZE,
+        "per_device_eval_batch_size": BATCH_SIZE,
+        "gradient_accumulation_steps": GRAD_ACCUM_STEPS,
+        "learning_rate": LEARNING_RATE,
+        "weight_decay": WEIGHT_DECAY,
+        "load_best_model_at_end": True,
+        "metric_for_best_model": "exact_match",
+        "greater_is_better": True,
+        "save_total_limit": SAVE_TOTAL_LIMIT,
+        "predict_with_generate": True,
+        "generation_max_length": MAX_TARGET_LENGTH,
+        "logging_dir": LOGS_DIR,
+        "logging_steps": 10,
+        "report_to": "none",
+        "seed": SEED,
+        "data_seed": SEED,
+        "fp16": torch.cuda.is_available(),
+    }
 
-        # Generation settings for evaluation
-        predict_with_generate=True,
-        generation_max_length=MAX_TARGET_LENGTH,
+    # Handle evaluation strategy (eval_strategy vs evaluation_strategy depending on transformers version)
+    if "eval_strategy" in sig_params:
+        training_kwargs["eval_strategy"] = "epoch"
+    elif "evaluation_strategy" in sig_params:
+        training_kwargs["evaluation_strategy"] = "epoch"
 
-        # Logging
-        logging_dir=LOGS_DIR,
-        logging_steps=10,
-        report_to="none",   # set to "wandb" if you want W&B logging
+    if "save_strategy" in sig_params:
+        training_kwargs["save_strategy"] = "epoch"
 
-        # Reproducibility
-        seed=SEED,
-        data_seed=SEED,
+    # Handle warmup (warmup_steps vs warmup_ratio)
+    if "warmup_steps" in sig_params:
+        training_kwargs["warmup_steps"] = 50
+    elif "warmup_ratio" in sig_params:
+        training_kwargs["warmup_ratio"] = 0.1
 
-        # FP16 (only on GPU)
-        fp16=torch.cuda.is_available(),
-    )
+    # Filter to only pass parameters accepted by this transformers version
+    valid_kwargs = {k: v for k, v in training_kwargs.items() if k in sig_params}
+    training_args = Seq2SeqTrainingArguments(**valid_kwargs)
 
     # Trainer
     trainer = Seq2SeqTrainer(
