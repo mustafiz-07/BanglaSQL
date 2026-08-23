@@ -1,0 +1,12 @@
+# BanglaSQL — Colab-specific dependencies
+# Use this on Google Colab INSTEAD of requirements.txt
+#
+# Colab already has: torch, numpy, pandas, matplotlib, scikit-learn
+# We only install what's missing or needs a specific version.
+
+transformers>=4.40.0
+datasets>=2.18.0
+sentencepiece>=0.1.99
+accelerate>=0.28.0
+faker>=25.0.0
+sqlalchemy>=2.0.0
