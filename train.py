@@ -124,17 +124,17 @@ SCHEMA_STRING     = TRAIN_CONFIG["schema_string"]
 BATCH_SIZE       = 8       # Train batch size per device
 EVAL_BATCH_SIZE  = 16      # Eval batch size (larger for faster evaluation)
 GRAD_ACCUM_STEPS = 2       # Effective batch = BATCH_SIZE * GRAD_ACCUM_STEPS = 16
-LEARNING_RATE    = 2e-4    # Recommended learning rate for T5/BanglaT5 fine-tuning
-NUM_EPOCHS       = 20
-WEIGHT_DECAY     = 0.01
+LEARNING_RATE    = 5e-5    # Lowered from 2e-4 to prevent fast memorization on small data
+NUM_EPOCHS       = 15      # Reduced from 20; best model was at epoch 9 previously
+WEIGHT_DECAY     = 0.02    # Increased from 0.01 for stronger L2 regularization
 SAVE_TOTAL_LIMIT = 3       # Keep only the 3 best checkpoints
+LABEL_SMOOTHING  = 0.1     # Prevents overconfident predictions, standard for seq2seq
 
-# Early stopping: don't let it fire off a noisy/near-zero exact_match in the
-# first few epochs. BanglaT5 typically needs several epochs before it starts
-# producing well-formed SQL at all, so exact_match can legitimately sit at
-# 0.0 for a while even though the model is learning fine (watch eval_loss).
-EARLY_STOPPING_PATIENCE      = 5
-MIN_EPOCHS_BEFORE_EARLY_STOP = 8
+# Early stopping: now monitors eval_loss (smooth, reliable signal) instead of
+# exact_match (which plateaus noisily and caused the model to train all 20 epochs
+# while overfitting from epoch 9).
+EARLY_STOPPING_PATIENCE      = 4
+MIN_EPOCHS_BEFORE_EARLY_STOP = 5   # Reduced from 8; with more data + lower LR, basics learned faster
 
 # Beam search at eval time, matching inference (see colab_train.ipynb Step 8),
 # so eval_exact_match reflects how the model will actually be used.
@@ -349,8 +349,8 @@ def main():
         "learning_rate": LEARNING_RATE,
         "weight_decay": WEIGHT_DECAY,
         "load_best_model_at_end": True,
-        "metric_for_best_model": "exact_match",
-        "greater_is_better": True,
+        "metric_for_best_model": "eval_loss",
+        "greater_is_better": False,
         "save_total_limit": SAVE_TOTAL_LIMIT,
         "predict_with_generate": True,
         "generation_max_length": MAX_TARGET_LENGTH,
@@ -361,6 +361,7 @@ def main():
         "seed": SEED,
         "data_seed": SEED,
         "fp16": False,  # MUST be False: T5 architectures produce NaN overflow in standard FP16
+        "label_smoothing_factor": LABEL_SMOOTHING,
     }
 
     # Handle evaluation strategy across all transformers versions
