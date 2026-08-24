@@ -71,7 +71,7 @@ logger = logging.getLogger(__name__)
 # ── Paths ─────────────────────────────────────────────────────────────────────
 BASE_DIR      = os.path.dirname(os.path.abspath(__file__))
 DATA_DIR      = os.path.join(BASE_DIR, "data")
-CHECKPOINTS   = os.path.join(BASE_DIR, "checkpoints")
+CHECKPOINTS   = os.path.join(BASE_DIR, "checkpoints_run2")
 LOGS_DIR      = os.path.join(BASE_DIR, "logs")
 
 os.makedirs(CHECKPOINTS, exist_ok=True)
@@ -130,9 +130,9 @@ WEIGHT_DECAY     = 0.02    # Increased from 0.01 for stronger L2 regularization
 SAVE_TOTAL_LIMIT = 3       # Keep only the 3 best checkpoints
 LABEL_SMOOTHING  = 0.1     # Prevents overconfident predictions, standard for seq2seq
 
-# Early stopping: now monitors eval_loss (smooth, reliable signal) instead of
-# exact_match (which plateaus noisily and caused the model to train all 20 epochs
-# while overfitting from epoch 9).
+# Early stopping: monitors eval_exact_match (the metric that actually matters).
+# The warm-up guard (MIN_EPOCHS_BEFORE_EARLY_STOP) prevents patience from being
+# burned during the first epochs when exact_match is still near 0.
 EARLY_STOPPING_PATIENCE      = 4
 MIN_EPOCHS_BEFORE_EARLY_STOP = 5   # Reduced from 8; with more data + lower LR, basics learned faster
 
@@ -349,8 +349,8 @@ def main():
         "learning_rate": LEARNING_RATE,
         "weight_decay": WEIGHT_DECAY,
         "load_best_model_at_end": True,
-        "metric_for_best_model": "eval_loss",
-        "greater_is_better": False,
+        "metric_for_best_model": "eval_exact_match",
+        "greater_is_better": True,
         "save_total_limit": SAVE_TOTAL_LIMIT,
         "predict_with_generate": True,
         "generation_max_length": MAX_TARGET_LENGTH,
