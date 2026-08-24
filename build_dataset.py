@@ -20,6 +20,32 @@ Outputs:
     data/dataset_dev.json
     data/dataset_test.json
     data/dataset_stats.json
+
+== Changelog (Phase 3 fix pass) ==
+- apply_synonyms() used to collect candidate paraphrases in a `set` and then
+  slice the first `n` of them. Python randomizes string hashing per process
+  by default, so `set` iteration order is NOT stable across runs even with
+  `random.seed(SEED)` fixed — three fresh runs of this script could each
+  produce a different subset of synonym variants, silently breaking the
+  "fully reproducible" guarantee this module documents. Fixed by collecting
+  variants in an order-preserving list instead.
+- split_dataset()'s pattern-holdout logic picked a fixed *number* of query
+  patterns for dev/test (e.g. round(15% of pattern count)), then dumped every
+  example belonging to those patterns into that split. Because augmentation
+  multiplies some patterns far more than others, this could easily blow the
+  intended 70/15/15 example ratio — in one observed run it produced 433
+  train / 343 dev examples, nearly 1:1 instead of ~70:15. First fix pass:
+  allocate whole patterns to whichever split (test/dev/train) is furthest
+  below its target *example* count, largest patterns first.
+- That first fix still broke down on the real templates.json: `select_where`
+  alone is 301/420 (72%) of the easy tier after augmentation. No whole-pattern
+  assignment can hit ~70/15/15 when one pattern IS 72% of a tier — wherever it
+  lands, that split balloons (observed: 30/22/48 train/dev/test). Second fix:
+  patterns larger than HOLDOUT_CAP are no longer held out wholesale — they're
+  split proportionally at the example level instead, so train/dev/test each
+  get representative coverage of dominant, everyday query shapes. Only the
+  smaller/rarer patterns are still held out wholly, for genuine structural
+  generalization testing.
 """
 
 import json
@@ -127,15 +153,26 @@ REWRITE_FRAMES = [
 # ── Core augmentation functions ────────────────────────────────────────────────
 
 def apply_synonyms(question: str, n: int = 1) -> list[str]:
-    """Return up to n variants of question by swapping one synonym per variant."""
-    variants = set()
+    """
+    Return up to n variants of question by swapping one synonym per variant.
+
+    NOTE: candidates are collected into an order-preserving list, not a set.
+    A `set` of strings iterates in an order that depends on Python's per-process
+    string-hash seed (randomized by default), so slicing `list(a_set)[:n]` can
+    silently return a different subset of variants on every run even with
+    random.seed(SEED) fixed. Using a list (with a separate `seen` set purely
+    for membership testing, never iterated) keeps this fully deterministic.
+    """
+    variants = []
+    seen = set()
     for original, replacements in SYNONYMS.items():
         if original in question:
             for repl in replacements:
                 new_q = question.replace(original, repl, 1)
-                if new_q != question:
-                    variants.add(new_q)
-    return list(variants)[:n]
+                if new_q != question and new_q not in seen:
+                    seen.add(new_q)
+                    variants.append(new_q)
+    return variants[:n]
 
 
 def apply_rewrite_frames(question: str) -> list[str]:
@@ -219,10 +256,28 @@ def split_dataset(all_pairs: list[dict]):
     """
     Split into train/dev/test.
     Strategy:
-      - Within each difficulty tier (easy, medium), hold out 15% of unique
-        query *patterns* (query_type) exclusively for test.
-      - This ensures the test set always contains both easy and medium samples
-        while still measuring generalization (not memorization of seen patterns).
+      - Within each difficulty tier (easy, medium), most query *patterns*
+        (query_type) are held out WHOLLY for dev/test, so the split measures
+        generalization to unseen SQL shapes, not just memorization.
+      - Patterns are assigned greedily: the largest holdout-eligible patterns
+        are placed first, each going to whichever of {test, dev} is currently
+        furthest below its target example count (falling through to train
+        once both targets are met).
+      - Exception: a pattern that is itself larger than HOLDOUT_CAP (a
+        dominant, "bread and butter" pattern) is NOT held out wholesale.
+        Real datasets built from hand-written templates are rarely balanced
+        across query shapes — here `select_where` alone is 43/120 (36%) of
+        base templates and, after augmentation, 301/420 (72%) of the easy
+        tier. Holding a pattern that dominant out entirely makes it
+        impossible to hit anything near 70/15/15 (wherever it goes, that
+        split's share balloons — this was verified empirically: it produced
+        a 30/22/48 train/dev/test split). Worse, if it's held out of train,
+        train ends up with zero examples of what's likely the single most
+        common real-world query shape (basic WHERE filtering). Instead,
+        oversized patterns are split proportionally at the example level, so
+        train/dev/test each get representative coverage of them; only the
+        smaller/rarer patterns are used for genuine structural
+        generalization testing.
     """
     def split_tier(pairs):
         by_pattern: dict[str, list[dict]] = {}
@@ -230,24 +285,62 @@ def split_dataset(all_pairs: list[dict]):
             qt = pair.get("query_type", "unknown")
             by_pattern.setdefault(qt, []).append(pair)
 
-        patterns = list(by_pattern.keys())
-        random.shuffle(patterns)
+        total = len(pairs)
+        if total == 0:
+            return [], [], []
 
-        n_test = max(1, round(len(patterns) * TEST_RATIO))
-        n_dev  = max(1, round(len(patterns) * DEV_RATIO))
+        pattern_items = list(by_pattern.items())
+        random.shuffle(pattern_items)
 
-        test_patterns = set(patterns[:n_test])
-        dev_patterns  = set(patterns[n_test:n_test + n_dev])
+        if len(pattern_items) < 3:
+            # Too few distinct patterns to hold any out meaningfully without
+            # starving train entirely — keep everything in train.
+            return pairs, [], []
+
+        target_test = total * TEST_RATIO
+        target_dev  = total * DEV_RATIO
+
+        # A pattern bigger than this can't be held out wholesale without
+        # blowing past a split's target share on its own — give it
+        # proportional example-level treatment instead.
+        HOLDOUT_CAP = max(target_test, target_dev) * 1.5
+
+        holdout_candidates = [(qt, ps) for qt, ps in pattern_items if len(ps) <= HOLDOUT_CAP]
+        oversized          = [(qt, ps) for qt, ps in pattern_items if len(ps) >  HOLDOUT_CAP]
+
+        # Largest-first among holdout-eligible patterns, so each one lands
+        # where the deficit is greatest instead of arbitrary shuffle order.
+        holdout_candidates.sort(key=lambda kv: len(kv[1]), reverse=True)
 
         tr, dv, te = [], [], []
-        for qt, ps in by_pattern.items():
-            random.shuffle(ps)
-            if qt in test_patterns:
-                te.extend(ps)
-            elif qt in dev_patterns:
-                dv.extend(ps)
-            else:
+        test_n = dev_n = 0
+
+        for _, ps in holdout_candidates:
+            test_deficit = target_test - test_n
+            dev_deficit  = target_dev - dev_n
+
+            if test_deficit <= 0 and dev_deficit <= 0:
                 tr.extend(ps)
+            elif test_deficit >= dev_deficit:
+                te.extend(ps)
+                test_n += len(ps)
+            else:
+                dv.extend(ps)
+                dev_n += len(ps)
+
+        # Oversized/dominant patterns: proportional example-level split
+        # (not held out wholesale) so every split gets representative
+        # coverage of these common shapes.
+        for _, ps in oversized:
+            ps = ps[:]
+            random.shuffle(ps)
+            n = len(ps)
+            n_test_i = round(n * TEST_RATIO)
+            n_dev_i  = round(n * DEV_RATIO)
+            te.extend(ps[:n_test_i])
+            dv.extend(ps[n_test_i:n_test_i + n_dev_i])
+            tr.extend(ps[n_test_i + n_dev_i:])
+
         return tr, dv, te
 
     easy_pairs   = [p for p in all_pairs if p["difficulty"] == "easy"]

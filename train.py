@@ -15,6 +15,22 @@ Models: csebuetnlp/banglat5 (primary) | google/mt5-small (fallback)
 == Fallback trigger ==
 If BanglaT5 does not reach >20% execution accuracy on the dev set
 after 10 epochs, change MODEL_NAME to "google/mt5-small" in train_config.json and retrain.
+
+== Changelog (Phase 3 fix pass) ==
+- Removed the `model.config.tie_word_embeddings = False` override. T5 physically
+  shares the embed_tokens/lm_head tensor; flipping the config flag without
+  actually untying the weights caused safetensors to save a checkpoint with
+  encoder/decoder embeddings missing, which were then randomly re-initialized
+  on reload (`best_model` was silently corrupted). The HF warning this used to
+  silence is purely cosmetic and is safe to ignore.
+- Replaced EarlyStoppingCallback with a warm-up variant that ignores evaluations
+  before MIN_EPOCHS_BEFORE_EARLY_STOP. On a small dataset, exact_match reads 0.0
+  for the first several epochs while the model is still learning basic syntax
+  (eval_loss was still dropping steadily), so plain patience=4 on exact_match
+  stopped training at epoch 5 of a planned 20 before it had any real chance.
+- Eval-time generation now uses beam search (EVAL_NUM_BEAMS) to match the beam
+  search used at inference time in the notebook, so eval_exact_match is a more
+  representative signal.
 """
 
 import json
@@ -113,6 +129,17 @@ NUM_EPOCHS       = 20
 WEIGHT_DECAY     = 0.01
 SAVE_TOTAL_LIMIT = 3       # Keep only the 3 best checkpoints
 
+# Early stopping: don't let it fire off a noisy/near-zero exact_match in the
+# first few epochs. BanglaT5 typically needs several epochs before it starts
+# producing well-formed SQL at all, so exact_match can legitimately sit at
+# 0.0 for a while even though the model is learning fine (watch eval_loss).
+EARLY_STOPPING_PATIENCE      = 5
+MIN_EPOCHS_BEFORE_EARLY_STOP = 8
+
+# Beam search at eval time, matching inference (see colab_train.ipynb Step 8),
+# so eval_exact_match reflects how the model will actually be used.
+EVAL_NUM_BEAMS = 4
+
 
 # ── Dataset ───────────────────────────────────────────────────────────────────
 
@@ -188,6 +215,34 @@ class BanglaSQLDataset(Dataset):
         return model_inputs
 
 
+# ── Early stopping with a warm-up period ───────────────────────────────────────
+
+class WarmupEarlyStoppingCallback(EarlyStoppingCallback):
+    """
+    Identical to EarlyStoppingCallback, except evaluations that happen before
+    `min_epochs` are ignored entirely (not even used to set the initial "best"
+    score). This prevents patience being burned on epochs where exact_match is
+    still 0.0 for every candidate, which previously stopped training at epoch 5
+    of a planned 20-epoch run.
+    """
+
+    def __init__(self, early_stopping_patience=4, early_stopping_threshold=0.0, min_epochs=0):
+        super().__init__(
+            early_stopping_patience=early_stopping_patience,
+            early_stopping_threshold=early_stopping_threshold,
+        )
+        self.min_epochs = min_epochs
+
+    def on_evaluate(self, args, state, control, metrics, **kwargs):
+        if state.epoch is not None and state.epoch < self.min_epochs:
+            logger.info(
+                f"[early-stopping] epoch {state.epoch:.2f} < warm-up threshold "
+                f"({self.min_epochs}) — skipping early-stopping check this round."
+            )
+            return
+        super().on_evaluate(args, state, control, metrics, **kwargs)
+
+
 # ── Metrics ───────────────────────────────────────────────────────────────────
 
 def compute_metrics(eval_preds, tokenizer):
@@ -238,6 +293,7 @@ def main():
     logger.info(f"Batch size  : {BATCH_SIZE} (x{GRAD_ACCUM_STEPS} grad accum = {BATCH_SIZE*GRAD_ACCUM_STEPS} effective)")
     logger.info(f"Epochs      : {NUM_EPOCHS}")
     logger.info(f"LR          : {LEARNING_RATE}")
+    logger.info(f"Early stop  : patience={EARLY_STOPPING_PATIENCE}, warm-up={MIN_EPOCHS_BEFORE_EARLY_STOP} epochs")
 
     device = "cuda" if torch.cuda.is_available() else "cpu"
     logger.info(f"Device      : {device}")
@@ -252,10 +308,15 @@ def main():
     tokenizer = AutoTokenizer.from_pretrained(MODEL_NAME)
     model     = AutoModelForSeq2SeqLM.from_pretrained(MODEL_NAME)
 
-    # Clean tie_word_embeddings warning if applicable
-    if hasattr(model.config, "tie_word_embeddings"):
-        model.config.tie_word_embeddings = False
-
+    # NOTE: we deliberately do NOT touch model.config.tie_word_embeddings here.
+    # T5-family models physically share the same tensor between
+    # encoder/decoder embeddings and lm_head. Flipping the config flag to
+    # "untied" without actually copying out separate weights causes
+    # safetensors to save a checkpoint that's missing those tensors (since
+    # they're still the same object in memory), and they get randomly
+    # re-initialized on reload — silently corrupting the saved model. The HF
+    # warning this would have silenced is purely cosmetic; it's safe to leave
+    # tie_word_embeddings alone.
     logger.info(f"Model parameters: {sum(p.numel() for p in model.parameters()):,}")
 
     # Load datasets
@@ -293,6 +354,7 @@ def main():
         "save_total_limit": SAVE_TOTAL_LIMIT,
         "predict_with_generate": True,
         "generation_max_length": MAX_TARGET_LENGTH,
+        "generation_num_beams": EVAL_NUM_BEAMS,
         "logging_dir": LOGS_DIR,
         "logging_steps": 10,
         "report_to": "none",
@@ -329,7 +391,10 @@ def main():
         "data_collator": data_collator,
         "compute_metrics": lambda p: compute_metrics(p, tokenizer),
         "callbacks": [
-            EarlyStoppingCallback(early_stopping_patience=4)
+            WarmupEarlyStoppingCallback(
+                early_stopping_patience=EARLY_STOPPING_PATIENCE,
+                min_epochs=MIN_EPOCHS_BEFORE_EARLY_STOP,
+            )
         ],
     }
 

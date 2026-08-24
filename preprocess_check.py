@@ -11,6 +11,16 @@ Usage:
     python preprocess_check.py
 
 Outputs a report and saves normalized datasets back to data/.
+
+== Changelog (Phase 3 fix pass) ==
+- Tokenizer coverage analysis, model selection (BanglaT5 vs mT5 fallback), and
+  max_input_length/max_target_length recommendations were all computed over
+  train + dev + test combined. That lets statistics from the held-out test
+  set leak into decisions made before training (which tokenizer/model to use,
+  how aggressively to truncate) — a mild but real form of test-set peeking.
+  Fixed by computing these over train + dev only. Unicode normalization is
+  still applied and saved for all three splits, since that's just consistent
+  preprocessing, not a decision informed by test-set content.
 """
 
 import json
@@ -38,7 +48,7 @@ SCHEMA_STRING = (
 
 def normalize_bangla(text: str) -> str:
     """Apply NFC Unicode normalization to ensure consistent Bangla representation."""
-    return unicodedata.normalize("NFC", text.strip())
+    return unicodedata.normalize("NFC", str(text).strip())
 
 
 def normalize_dataset_file(path: str) -> list[dict]:
@@ -102,7 +112,7 @@ def analyze_tokenizer(tokenizer, pairs: list[dict], model_name: str):
 
 # ── 3. Sequence Length Profiling ───────────────────────────────────────────────
 
-def profile_sequence_lengths(tokenizer, all_pairs: list[dict]):
+def profile_sequence_lengths(tokenizer, pairs: list[dict]):
     """
     Profile the distribution of input (question + schema) and output (SQL) lengths.
     Helps determine the right max_input_length and max_target_length.
@@ -110,7 +120,7 @@ def profile_sequence_lengths(tokenizer, all_pairs: list[dict]):
     input_lengths  = []
     output_lengths = []
 
-    for pair in all_pairs:
+    for pair in pairs:
         inp = f"translate Bangla to SQL: {normalize_bangla(pair['bangla_question'])} </s> {SCHEMA_STRING}"
         out = pair["sql_query"]
 
@@ -132,7 +142,7 @@ def profile_sequence_lengths(tokenizer, all_pairs: list[dict]):
         print(f"    p50={p50}, p90={p90}, p95={p95}, p99={p99}")
         return p95
 
-    print("\n  Sequence Length Profile (over all pairs):")
+    print("\n  Sequence Length Profile (over train + dev pairs):")
     in_p95  = stats(input_lengths,  "Input (question + schema)")
     out_p95 = stats(output_lengths, "Output (SQL query)")
 
@@ -153,9 +163,11 @@ def main():
     print("BanglaSQL — Phase 3: Preprocessing & Tokenizer Analysis")
     print("=" * 60)
 
-    # 1. Normalize
+    # 1. Normalize (applied and saved for ALL splits — this is just consistent
+    #    preprocessing, not a decision informed by data content, so including
+    #    test here is fine).
     print("\n[1/3] Unicode Normalization (NFC)...")
-    all_pairs = []
+    split_pairs = {}
     normalized_counts = {s: 0 for s in ["train", "dev", "test"]}
     for split in ["train", "dev", "test"]:
         path = os.path.join(DATA_DIR, f"dataset_{split}.json")
@@ -165,12 +177,24 @@ def main():
         pairs = normalize_dataset_file(path)
         normalized_counts[split] = sum(1 for p in pairs if p.get("was_normalized"))
         save_normalized(pairs, path)
-        all_pairs.extend(pairs)
+        split_pairs[split] = pairs
         print(f"  {split}: {len(pairs)} pairs, {normalized_counts[split]} normalized")
 
-    if not all_pairs:
+    if not split_pairs:
         print("No data found. Run build_dataset.py first.")
         return
+
+    # Everything below this point informs training decisions (tokenizer/model
+    # choice, max_length settings), so it must NOT see the test split — using
+    # test-set statistics to pick hyperparameters is a form of leakage.
+    analysis_pairs = split_pairs.get("train", []) + split_pairs.get("dev", [])
+    if not analysis_pairs:
+        print("No train/dev data found (only test present). Run build_dataset.py first.")
+        return
+    if "test" in split_pairs:
+        print(f"\n  (Analysis below uses train+dev only — {len(analysis_pairs)} pairs. "
+              f"Test split ({len(split_pairs['test'])} pairs) is excluded from here on "
+              f"so hyperparameter choices can't leak information from it.)")
 
     # 2. Tokenizer analysis
     print("\n[2/3] Tokenizer Analysis...")
@@ -185,7 +209,7 @@ def main():
         print(f"\n  Loading tokenizer: {model_name}")
         try:
             tok = AutoTokenizer.from_pretrained(model_name)
-            coverage = analyze_tokenizer(tok, all_pairs, model_name)
+            coverage = analyze_tokenizer(tok, analysis_pairs, model_name)
             results[model_name] = {"tokenizer": tok, "coverage": coverage}
         except Exception as e:
             print(f"  Failed to load {model_name}: {e}")
@@ -203,25 +227,31 @@ def main():
         chosen = FALLBACK
         print(f"  Use mT5-small ({FALLBACK}): better coverage ({mt5_cov:.1%} vs {bt5_cov:.1%})")
 
-    # 3. Sequence length profiling with chosen tokenizer
-    print("\n[3/3] Sequence Length Profiling...")
     chosen_tok = results[chosen]["tokenizer"]
-    if chosen_tok:
-        rec_in, rec_out = profile_sequence_lengths(chosen_tok, all_pairs)
+    if chosen_tok is None:
+        print(f"\n  [!] Could not load a tokenizer for either model (see errors above — "
+              f"likely a network issue). Skipping length profiling and config save; "
+              f"train.py will fall back to its built-in defaults.")
+        print("\n" + "=" * 60)
+        return
 
-        # Save recommendations to config file for use by train.py
-        config = {
-            "model_name":         chosen,
-            "max_input_length":   rec_in,
-            "max_target_length":  rec_out,
-            "schema_string":      SCHEMA_STRING,
-            "bt5_coverage":       round(bt5_cov, 4),
-            "mt5_coverage":       round(mt5_cov, 4),
-        }
-        config_path = os.path.join(DATA_DIR, "train_config.json")
-        with open(config_path, "w", encoding="utf-8") as f:
-            json.dump(config, f, ensure_ascii=False, indent=2)
-        print(f"\n  Config saved to: {config_path}")
+    # 3. Sequence length profiling with chosen tokenizer (train+dev only)
+    print("\n[3/3] Sequence Length Profiling...")
+    rec_in, rec_out = profile_sequence_lengths(chosen_tok, analysis_pairs)
+
+    # Save recommendations to config file for use by train.py
+    config = {
+        "model_name":         chosen,
+        "max_input_length":   rec_in,
+        "max_target_length":  rec_out,
+        "schema_string":      SCHEMA_STRING,
+        "bt5_coverage":       round(bt5_cov, 4),
+        "mt5_coverage":       round(mt5_cov, 4),
+    }
+    config_path = os.path.join(DATA_DIR, "train_config.json")
+    with open(config_path, "w", encoding="utf-8") as f:
+        json.dump(config, f, ensure_ascii=False, indent=2)
+    print(f"\n  Config saved to: {config_path}")
 
     print("\n" + "=" * 60)
     print("Preprocessing complete. Now upload to Colab/Kaggle and run train.py")
