@@ -71,7 +71,7 @@ logger = logging.getLogger(__name__)
 # ── Paths ─────────────────────────────────────────────────────────────────────
 BASE_DIR      = os.path.dirname(os.path.abspath(__file__))
 DATA_DIR      = os.path.join(BASE_DIR, "data")
-CHECKPOINTS   = os.path.join(BASE_DIR, "checkpoints_run2")
+CHECKPOINTS   = os.path.join(BASE_DIR, "checkpoints")
 LOGS_DIR      = os.path.join(BASE_DIR, "logs")
 
 os.makedirs(CHECKPOINTS, exist_ok=True)
@@ -124,17 +124,17 @@ SCHEMA_STRING     = TRAIN_CONFIG["schema_string"]
 BATCH_SIZE       = 8       # Train batch size per device
 EVAL_BATCH_SIZE  = 16      # Eval batch size (larger for faster evaluation)
 GRAD_ACCUM_STEPS = 2       # Effective batch = BATCH_SIZE * GRAD_ACCUM_STEPS = 16
-LEARNING_RATE    = 5e-5    # Lowered from 2e-4 to prevent fast memorization on small data
-NUM_EPOCHS       = 15      # Reduced from 20; best model was at epoch 9 previously
-WEIGHT_DECAY     = 0.02    # Increased from 0.01 for stronger L2 regularization
+LEARNING_RATE    = 2e-4    # Optimal LR for BanglaT5 fine-tuning on Seq2Seq SQL generation
+NUM_EPOCHS       = 20      # 20 epochs gives full convergence
+WEIGHT_DECAY     = 0.01    # Standard L2 regularization
 SAVE_TOTAL_LIMIT = 3       # Keep only the 3 best checkpoints
-LABEL_SMOOTHING  = 0.1     # Prevents overconfident predictions, standard for seq2seq
+LABEL_SMOOTHING  = 0.0     # Disabled: Exact SQL token generation requires sharp, confident probabilities
 
 # Early stopping: monitors eval_exact_match (the metric that actually matters).
 # The warm-up guard (MIN_EPOCHS_BEFORE_EARLY_STOP) prevents patience from being
-# burned during the first epochs when exact_match is still near 0.
-EARLY_STOPPING_PATIENCE      = 4
-MIN_EPOCHS_BEFORE_EARLY_STOP = 5   # Reduced from 8; with more data + lower LR, basics learned faster
+# burned during the initial epochs while basic syntax is being learned.
+EARLY_STOPPING_PATIENCE      = 5
+MIN_EPOCHS_BEFORE_EARLY_STOP = 6
 
 # Beam search at eval time, matching inference (see colab_train.ipynb Step 8),
 # so eval_exact_match reflects how the model will actually be used.
