@@ -1,16 +1,20 @@
 """
 BanglaSQL — Dataset Builder (Phase 2)
 
-Loads base templates, augments via rule-based paraphrasing, deduplicates,
+Loads base templates, augments via rule-based Bangla paraphrasing, deduplicates,
 and produces train/dev/test splits.
 
-Augmentation approach:
-  - No external API needed — purely rule-based synonym substitution and
-    question reordering so results are fully reproducible.
-  - Each template generates up to MAX_PARAPHRASES_PER_TEMPLATE variants.
-  - Dedup by exact Bangla string match.
-  - Splits preserve difficulty ratio and hold out 15% of query *patterns*
-    entirely from train to test generalization.
+Split strategy — template-level holdout, stratified by query_type:
+  Every augmented variant stays with its base template, so no paraphrase of a
+  training question can leak into dev/test. Templates are then split *within*
+  each query_type, which guarantees train sees every SQL shape while dev/test
+  consist entirely of unseen templates (new SQL + new Bangla).
+
+  The previous strategy held out whole query_types, leaving dev/test with
+  patterns (select_all, order_by, limit, select_distinct, ...) that never
+  appeared in train. Exact match on those is unreachable by construction, and
+  because early stopping monitors eval_exact_match, training was being steered
+  by a metric pinned near zero.
 
 Run:
     python build_dataset.py
@@ -20,38 +24,12 @@ Outputs:
     data/dataset_dev.json
     data/dataset_test.json
     data/dataset_stats.json
-
-== Changelog (Phase 3 fix pass) ==
-- apply_synonyms() used to collect candidate paraphrases in a `set` and then
-  slice the first `n` of them. Python randomizes string hashing per process
-  by default, so `set` iteration order is NOT stable across runs even with
-  `random.seed(SEED)` fixed — three fresh runs of this script could each
-  produce a different subset of synonym variants, silently breaking the
-  "fully reproducible" guarantee this module documents. Fixed by collecting
-  variants in an order-preserving list instead.
-- split_dataset()'s pattern-holdout logic picked a fixed *number* of query
-  patterns for dev/test (e.g. round(15% of pattern count)), then dumped every
-  example belonging to those patterns into that split. Because augmentation
-  multiplies some patterns far more than others, this could easily blow the
-  intended 70/15/15 example ratio — in one observed run it produced 433
-  train / 343 dev examples, nearly 1:1 instead of ~70:15. First fix pass:
-  allocate whole patterns to whichever split (test/dev/train) is furthest
-  below its target *example* count, largest patterns first.
-- That first fix still broke down on the real templates.json: `select_where`
-  alone is 301/420 (72%) of the easy tier after augmentation. No whole-pattern
-  assignment can hit ~70/15/15 when one pattern IS 72% of a tier — wherever it
-  lands, that split balloons (observed: 30/22/48 train/dev/test). Second fix:
-  patterns larger than HOLDOUT_CAP are no longer held out wholesale — they're
-  split proportionally at the example level instead, so train/dev/test each
-  get representative coverage of dominant, everyday query shapes. Only the
-  smaller/rarer patterns are still held out wholly, for genuine structural
-  generalization testing.
 """
 
 import json
 import random
-import re
 import os
+from collections import defaultdict
 from copy import deepcopy
 
 # ── Reproducibility ────────────────────────────────────────────────────────────
@@ -61,222 +39,154 @@ random.seed(SEED)
 # ── Config ─────────────────────────────────────────────────────────────────────
 DATA_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "data")
 TEMPLATES_PATH = os.path.join(DATA_DIR, "templates.json")
-MAX_PARAPHRASES_PER_TEMPLATE = 15  # increased to generate 2000+ examples for better training
+
+# 5 paraphrases per template keeps the corpus near the plan's 800-1000 target
+# without diluting it with near-identical surface variants.
+MAX_PARAPHRASES_PER_TEMPLATE = 5
 TRAIN_RATIO = 0.70
 DEV_RATIO   = 0.15
 TEST_RATIO  = 0.15
 
-# ── Synonym dictionaries (Cholito Bangla) ─────────────────────────────────────
+# ── Synonym dictionary (standard Cholito Bangla) ──────────────────────────────
+# Every entry must be meaning-preserving and grammatical in place. Substitutions
+# that shift meaning (গ্রেড→মার্ক), change register to Sadhu (ভর্তি হইয়াছে), or
+# require the rest of the clause to be rewritten (বেশি→ঊর্ধ্বে, which needs a
+# different postposition) are deliberately excluded — they were producing
+# question/SQL pairs that no longer matched.
 
 SYNONYMS = {
-    # verbs / request phrases
-    "দাও।":         ["দেখাও।", "বলো।", "প্রদর্শন করো।", "উপস্থাপন করো।", "জানাও।"],
-    "দেখাও।":       ["দাও।", "বলো।", "প্রদর্শন করো।", "জানাও।"],
-    "বলো।":         ["দাও।", "দেখাও।", "জানাও।", "প্রদর্শন করো।"],
-    "হিসাব করো।":  ["বের করো।", "নির্ণয় করো।", "গণনা করো।", "হিসেব করো।"],
-    "বের করো।":    ["হিসাব করো।", "নির্ণয় করো।", "বের করে দাও।"],
-    "দাও":          ["দেখাও", "বলো", "জানাও"],
-    "দেখাও":        ["দাও", "বলো", "প্রদর্শন করো"],
+    # request verbs
+    "দাও।":        ["দেখাও।", "জানাও।", "প্রদর্শন করো।"],
+    "দেখাও।":      ["দাও।", "জানাও।", "প্রদর্শন করো।"],
+    "বলো।":        ["দাও।", "দেখাও।", "জানাও।"],
+    "হিসাব করো।":  ["বের করো।", "নির্ণয় করো।"],
+    "বের করো।":    ["হিসাব করো।", "নির্ণয় করো।"],
 
     # query subjects
-    "তালিকা দাও":       ["তথ্য দাও", "নাম দাও", "তথ্য দেখাও", "তালিকা দেখাও"],
-    "তথ্য দাও":         ["তালিকা দাও", "বিস্তারিত দাও", "তথ্য দেখাও"],
-    "নাম দাও":          ["তালিকা দাও", "তথ্য দাও", "নাম দেখাও"],
-    "নাম ও CGPA দাও":   ["CGPA সহ নাম দাও", "নাম ও তাদের CGPA দেখাও", "নাম এবং CGPA দাও"],
-    "নাম ও ইমেইল":      ["নাম এবং ইমেইল", "নাম সহ ইমেইল"],
-    "নাম ও পদমর্যাদা":   ["নাম এবং পদমর্যাদা", "নাম সহ পদবি"],
+    "তালিকা দাও":  ["তালিকা দেখাও", "তথ্য দাও"],
+    "তথ্য দাও":    ["তালিকা দাও", "বিস্তারিত দাও"],
+    "নাম দাও":     ["নাম দেখাও", "নামের তালিকা দাও"],
 
-    # quantifiers / qualifiers
-    "সকল":          ["সব", "সমস্ত", "যাবতীয়", "প্রত্যেক"],
-    "সব":           ["সকল", "সমস্ত", "প্রত্যেক"],
-    "সমস্ত":        ["সকল", "সব", "যাবতীয়"],
-    "যেসব":         ["যারা", "সেইসব", "ঐসব", "যে"],
-    "যারা":         ["যেসব", "সেইসব", "যে সকল"],
-    "কারা":         ["কে কে", "কোন কোন", "কারা কারা"],
-    "প্রতিটি":      ["প্রত্যেক", "প্রতি", "প্রতিটা"],
-    "প্রতিজন":     ["প্রত্যেক", "প্রতি"],
+    # quantifiers
+    "সকল":   ["সব", "সমস্ত"],
+    "সব":    ["সকল", "সমস্ত"],
+    "সমস্ত": ["সকল", "সব"],
+    "যেসব":  ["যারা", "যে সকল"],
+    "যারা":  ["যেসব", "যে সকল"],
+    "কারা":  ["কে কে", "কোন কোন"],
+    "প্রতিটি": ["প্রত্যেক", "প্রতিটা"],
 
-    # comparison phrases
-    "বেশি":         ["বেশি হয়", "অধিক", "ঊর্ধ্বে", "বেশী"],
-    "কম":           ["কমতি", "নিম্নে", "কম হয়"],
-    "বেশি বা সমান": ["সমান বা তার বেশি", "কমপক্ষে", "অন্তত"],
-    "কমের কম":     ["সর্বনিম্ন", "অন্তত"],
-    "-এর বেশি":    ["-এর অধিক", " থেকে বেশি"],
-    "-এর কম":      [" থেকে কম", "-এর নিচে"],
+    # comparison
+    "বেশি": ["অধিক", "বেশী"],
 
-    # sort / order phrases
-    "অবরোহী ক্রমে সাজাও": ["বড় থেকে ছোট ক্রমে দেখাও", "নামতা ক্রমে সাজাও", "উচ্চ থেকে নিম্ন ক্রমে দেখাও"],
-    "আরোহী ক্রমে সাজাও":  ["ছোট থেকে বড় ক্রমে দেখাও", "উর্ধ্বক্রমে সাজাও", "নিম্ন থেকে উচ্চ ক্রমে দেখাও"],
-    "অবরোহী ক্রমে":       ["বড় থেকে ছোট ক্রমে", "নামতা অনুযায়ী", "উচ্চ থেকে নিম্ন ক্রমে"],
-    "আরোহী ক্রমে":        ["ছোট থেকে বড় ক্রমে", "নিম্ন থেকে উচ্চ ক্রমে"],
-    "অনুযায়ী সাজিয়ে":    ["অনুযায়ী ক্রমে", "অনুসারে সাজিয়ে"],
+    # ordering
+    "অবরোহী ক্রমে": ["বড় থেকে ছোট ক্রমে", "উচ্চ থেকে নিম্ন ক্রমে"],
+    "আরোহী ক্রমে":  ["ছোট থেকে বড় ক্রমে", "নিম্ন থেকে উচ্চ ক্রমে"],
+    "অনুযায়ী সাজিয়ে": ["অনুসারে সাজিয়ে", "অনুযায়ী ক্রমে"],
 
-    # admission / year
-    "ভর্তি হয়েছে":    ["ভর্তি নিয়েছে", "ভর্তি হয়েছিল", "ভর্তি হইয়াছে"],
-    "যোগ দিয়েছেন":  ["যোগদান করেছেন", "নিয়োগ পেয়েছেন", "যোগ দিয়াছেন"],
-    "যোগ দেওয়া":    ["যোগদান করা", "যোগদানকারী"],
+    # admission / joining
+    "ভর্তি হয়েছে":   ["ভর্তি হয়েছিল", "ভর্তি নিয়েছে"],
+    "যোগ দিয়েছেন":  ["যোগদান করেছেন", "নিয়োগ পেয়েছেন"],
 
-    # academic terms
-    "নথিভুক্ত":    ["ভর্তি", "রেজিস্ট্রেশন করা", "এনরোল"],
-    "নথিভুক্ত আছে": ["ভর্তি আছে", "রেজিস্ট্রেশন করা আছে", "এনরোল আছে"],
-    "পদমর্যাদার":  ["পদের", "পদবির", "ডেসিগনেশনের"],
-    "শিক্ষার্থী":  ["ছাত্রছাত্রী", "শিক্ষানবিস", "স্টুডেন্ট"],
-    "শিক্ষার্থীর": ["ছাত্রছাত্রীর", "স্টুডেন্টের"],
-    "শিক্ষার্থীদের": ["ছাত্রছাত্রীদের", "স্টুডেন্টদের"],
-    "শিক্ষক":     ["অধ্যাপক", "শিক্ষামণ্ডলী", "ইন্সট্রাক্টর"],
-    "শিক্ষকের":   ["অধ্যাপকের", "ইন্সট্রাক্টরের"],
-    "শিক্ষকদের":  ["অধ্যাপকদের", "ইন্সট্রাক্টরদের"],
-    "বিভাগ":      ["ডিপার্টমেন্ট", "বিভাগীয়"],
-    "বিভাগের":    ["ডিপার্টমেন্টের"],
-    "বিভাগে":     ["ডিপার্টমেন্টে"],
-    "কোর্স":      ["বিষয়", "পাঠ্যক্রম", "কোর্সের"],
-    "কোর্সে":     ["বিষয়ে", "পাঠ্যক্রমে"],
-    "কোর্সের":    ["বিষয়ের", "পাঠ্যক্রমের"],
-    "সেমিস্টার":  ["সেশন", "পর্ব", "টার্ম"],
-    "সেমিস্টারে":  ["সেশনে", "পর্বে", "টার্মে"],
-    "উপস্থিত":    ["হাজির", "উপস্থিত ছিল", "প্রেজেন্ট"],
-    "অনুপস্থিত":  ["অনুপস্থিত ছিল", "হাজির ছিল না", "গরহাজির", "অ্যাবসেন্ট"],
-    "গ্রেড":      ["মার্ক", "রেজাল্ট"],
-    "গ্রেড পয়েন্ট": ["জিপিএ", "গ্রেড পয়েন্ট"],
+    # academic vocabulary
+    "নথিভুক্ত":       ["ভর্তি", "এনরোল"],
+    "শিক্ষার্থী":     ["ছাত্রছাত্রী", "স্টুডেন্ট"],
+    "শিক্ষার্থীর":    ["ছাত্রছাত্রীর", "স্টুডেন্টের"],
+    "শিক্ষার্থীদের":  ["ছাত্রছাত্রীদের", "স্টুডেন্টদের"],
+    "শিক্ষক":        ["ইন্সট্রাক্টর"],
+    "শিক্ষকের":      ["ইন্সট্রাক্টরের"],
+    "শিক্ষকদের":     ["ইন্সট্রাক্টরদের"],
+    "বিভাগ":   ["ডিপার্টমেন্ট"],
+    "বিভাগের": ["ডিপার্টমেন্টের"],
+    "বিভাগে":  ["ডিপার্টমেন্টে"],
+    "কোর্স":   ["বিষয়"],
+    "কোর্সে":  ["বিষয়ে"],
+    "কোর্সের": ["বিষয়ের"],
+    "উপস্থিত":   ["হাজির", "প্রেজেন্ট"],
+    "অনুপস্থিত": ["গরহাজির", "অ্যাবসেন্ট"],
 
-    # aggregate terms
-    "গড়":        ["গড় মান", "সমগড়", "এভারেজ"],
-    "মোট":       ["সর্বমোট", "মোট সংখ্যা", "টোটাল"],
-    "সর্বোচ্চ":  ["সবচেয়ে বেশি", "সর্বাধিক", "ম্যাক্সিমাম"],
-    "সর্বনিম্ন": ["সবচেয়ে কম", "ন্যূনতম", "মিনিমাম"],
-    "সংখ্যা":    ["পরিমাণ", "কাউন্ট"],
+    # aggregates
+    "গড়":      ["গড় মান", "এভারেজ"],
+    "মোট":     ["সর্বমোট", "টোটাল"],
+    "সর্বোচ্চ": ["সবচেয়ে বেশি", "সর্বাধিক"],
+    "সর্বনিম্ন": ["সবচেয়ে কম", "ন্যূনতম"],
+    "সংখ্যা":   ["পরিমাণ"],
 
     # question starters
-    "কোন":       ["কোন কোন", "কোনটি", "কী কী"],
-    "কতজন":     ["কত সংখ্যক", "মোট কতজন", "কতজন করে"],
-    "কতটি":     ["কতগুলো", "কত সংখ্যক", "কয়টি"],
-    "কত":       ["কতটুকু", "কত পরিমাণ"],
+    "কতজন": ["কত সংখ্যক", "মোট কতজন"],
+    "কতটি": ["কতগুলো", "কয়টি"],
 }
 
-# ── Prefix/suffix paraphrase templates ────────────────────────────────────────
-# These are sentence-level rewrites applied on top of synonym substitution.
-# Format: (prefix_to_add, suffix_to_add)  — both optional ("" = skip)
+# ── Register frames ────────────────────────────────────────────────────────────
+# Applied by sentence type. Imperative politeness markers (অনুগ্রহ করে / দয়া করে)
+# only fit commands ending in "।"; prefixing them onto a "কত?" question is
+# ungrammatical, which is what the old shared frame list was producing.
 
-REWRITE_FRAMES = [
-    # No change — base form
-    ("", ""),
-    # Add polite request prefix
-    ("অনুগ্রহ করে, ", ""),
-    # Add "আমাকে" (tell me)
-    ("আমাকে জানাও — ", ""),
-    # Rephrase as "কী?" style
-    ("", " কী?"),
-    # Add emphasis
-    ("দয়া করে ", ""),
-    # Indirect phrasing
-    ("আমি জানতে চাই: ", ""),
-    # Database query style
-    ("ডাটাবেস থেকে ", ""),
-    # Formal request
-    ("দয়া করে জানাও, ", ""),
-    # SQL-style request
-    ("SQL দিয়ে বের করো: ", ""),
-    # Conversational
-    ("আমাকে বলো, ", ""),
-]
+COMMAND_FRAMES  = ["অনুগ্রহ করে, ", "দয়া করে ", "ডাটাবেস থেকে "]
+QUESTION_FRAMES = ["আমি জানতে চাই, ", "বলো তো, ", "একটু বলো, "]
 
 
-# ── Core augmentation functions ────────────────────────────────────────────────
+# ── Core augmentation ──────────────────────────────────────────────────────────
 
-def apply_synonyms(question: str, n: int = 1) -> list[str]:
+def apply_synonyms(question: str, n: int = 3) -> list[str]:
+    """Return up to n variants, each swapping one synonym.
+
+    Candidates are collected in an order-preserving list, not a set: Python
+    randomizes string hashing per process, so slicing list(a_set)[:n] returns a
+    different subset on every run even with random.seed() fixed.
     """
-    Return up to n variants of question by swapping one synonym per variant.
-
-    NOTE: candidates are collected into an order-preserving list, not a set.
-    A `set` of strings iterates in an order that depends on Python's per-process
-    string-hash seed (randomized by default), so slicing `list(a_set)[:n]` can
-    silently return a different subset of variants on every run even with
-    random.seed(SEED) fixed. Using a list (with a separate `seen` set purely
-    for membership testing, never iterated) keeps this fully deterministic.
-    """
-    variants = []
-    seen = set()
+    variants, seen = [], set()
     for original, replacements in SYNONYMS.items():
-        if original in question:
-            for repl in replacements:
-                new_q = question.replace(original, repl, 1)
-                if new_q != question and new_q not in seen:
-                    seen.add(new_q)
-                    variants.append(new_q)
+        if original not in question:
+            continue
+        for repl in replacements:
+            new_q = question.replace(original, repl, 1)
+            if new_q != question and new_q not in seen:
+                seen.add(new_q)
+                variants.append(new_q)
     return variants[:n]
 
 
-def apply_rewrite_frames(question: str) -> list[str]:
-    """Apply prefix/suffix rewrite frames to the question."""
-    # Strip trailing punctuation for frames that add their own
-    q_stripped = question.rstrip("।?")
-    variants = []
-    for prefix, suffix in REWRITE_FRAMES:
-        if prefix == "" and suffix == "":
-            continue  # skip identity frame (base already exists)
-        new_q = f"{prefix}{question}"
-        if suffix and not new_q.endswith(suffix):
-            new_q = f"{prefix}{q_stripped}{suffix}"
-        if new_q != question:
-            variants.append(new_q)
-    return variants
+def apply_frames(question: str) -> list[str]:
+    """Prepend a register marker appropriate to the sentence type."""
+    frames = QUESTION_FRAMES if question.rstrip().endswith("?") else COMMAND_FRAMES
+    return [f"{frame}{question}" for frame in frames]
 
 
 def augment_template(template: dict) -> list[dict]:
-    """Produce augmented variants of a single template."""
+    """Produce up to MAX_PARAPHRASES_PER_TEMPLATE variants of one template."""
     base_q = template["bangla_question"]
-    sql    = template["sql_query"]
-    candidates = []
 
-    # Synonym substitution
-    for var_q in apply_synonyms(base_q, n=3):
-        candidates.append(var_q)
+    # Synonyms first: they vary the content words the model must actually ground
+    # onto schema elements. Frames only vary the wrapper.
+    candidates = apply_synonyms(base_q, n=3) + apply_frames(base_q)
 
-    # Rewrite frames on base
-    for var_q in apply_rewrite_frames(base_q):
-        candidates.append(var_q)
-
-    # Synonym substitution on already-rewritten variants (double augmentation)
-    for rewritten in apply_rewrite_frames(base_q)[:2]:
-        for var_q in apply_synonyms(rewritten, n=1):
-            candidates.append(var_q)
-
-    # Deduplicate within this template's candidates
     seen = {base_q}
-    unique_candidates = []
+    unique = []
     for q in candidates:
-        q_stripped = q.strip()
-        if q_stripped and q_stripped not in seen:
-            seen.add(q_stripped)
-            unique_candidates.append(q_stripped)
-
-    # Cap
-    selected = unique_candidates[:MAX_PARAPHRASES_PER_TEMPLATE]
+        q = q.strip()
+        if q and q not in seen:
+            seen.add(q)
+            unique.append(q)
 
     results = []
-    for i, q in enumerate(selected, start=1):
+    for i, q in enumerate(unique[:MAX_PARAPHRASES_PER_TEMPLATE], start=1):
         variant = deepcopy(template)
         variant["template_id"] = f"{template['template_id']}_aug{i:02d}"
+        variant["base_template_id"] = template["template_id"]
         variant["bangla_question"] = q
         variant["is_augmented"] = True
         results.append(variant)
-
     return results
 
 
-# ── Deduplication ──────────────────────────────────────────────────────────────
-
 def deduplicate(pairs: list[dict]) -> list[dict]:
-    """
-    Remove exact-duplicate Bangla questions.
-    Also removes pairs where a (question, sql) duplicate exists.
-    """
-    seen_questions = set()
-    unique = []
+    """Remove exact-duplicate Bangla questions, keeping first occurrence."""
+    seen, unique = set(), []
     for pair in pairs:
         key = pair["bangla_question"].strip().lower()
-        if key not in seen_questions:
-            seen_questions.add(key)
+        if key not in seen:
+            seen.add(key)
             unique.append(pair)
     return unique
 
@@ -284,145 +194,103 @@ def deduplicate(pairs: list[dict]) -> list[dict]:
 # ── Dataset split ──────────────────────────────────────────────────────────────
 
 def split_dataset(all_pairs: list[dict]):
+    """Split by base template, stratified by query_type.
+
+    Within each query_type the *templates* are partitioned 70/15/15, then every
+    augmented variant follows its base template into that split. This gives two
+    properties the old split lacked:
+      - train contains at least one template of every query_type, so no SQL
+        shape is unreachable at evaluation time;
+      - dev/test templates are entirely unseen, so scores measure generalization
+        to new questions rather than memorized paraphrases.
+
+    Query types with a single template go wholly to train — holding out the only
+    example of a shape would just make it unlearnable again.
     """
-    Split into train/dev/test.
-    Strategy:
-      - Within each difficulty tier (easy, medium), most query *patterns*
-        (query_type) are held out WHOLLY for dev/test, so the split measures
-        generalization to unseen SQL shapes, not just memorization.
-      - Patterns are assigned greedily: the largest holdout-eligible patterns
-        are placed first, each going to whichever of {test, dev} is currently
-        furthest below its target example count (falling through to train
-        once both targets are met).
-      - Exception: a pattern that is itself larger than HOLDOUT_CAP (a
-        dominant, "bread and butter" pattern) is NOT held out wholesale.
-        Real datasets built from hand-written templates are rarely balanced
-        across query shapes — here `select_where` alone is 43/120 (36%) of
-        base templates and, after augmentation, 301/420 (72%) of the easy
-        tier. Holding a pattern that dominant out entirely makes it
-        impossible to hit anything near 70/15/15 (wherever it goes, that
-        split's share balloons — this was verified empirically: it produced
-        a 30/22/48 train/dev/test split). Worse, if it's held out of train,
-        train ends up with zero examples of what's likely the single most
-        common real-world query shape (basic WHERE filtering). Instead,
-        oversized patterns are split proportionally at the example level, so
-        train/dev/test each get representative coverage of them; only the
-        smaller/rarer patterns are used for genuine structural
-        generalization testing.
-    """
-    def split_tier(pairs):
-        by_pattern: dict[str, list[dict]] = {}
-        for pair in pairs:
-            qt = pair.get("query_type", "unknown")
-            by_pattern.setdefault(qt, []).append(pair)
+    by_template = defaultdict(list)
+    for pair in all_pairs:
+        by_template[pair["base_template_id"]].append(pair)
 
-        total = len(pairs)
-        if total == 0:
-            return [], [], []
+    templates_by_type = defaultdict(list)
+    for tid, pairs in by_template.items():
+        templates_by_type[pairs[0].get("query_type", "unknown")].append(tid)
 
-        pattern_items = list(by_pattern.items())
-        random.shuffle(pattern_items)
+    train_t, dev_t, test_t = [], [], []
+    for qtype in sorted(templates_by_type):
+        tids = sorted(templates_by_type[qtype])
+        random.shuffle(tids)
+        n = len(tids)
 
-        if len(pattern_items) < 3:
-            # Too few distinct patterns to hold any out meaningfully without
-            # starving train entirely — keep everything in train.
-            return pairs, [], []
+        if n == 1:
+            train_t += tids
+        elif n == 2:
+            train_t.append(tids[0])
+            test_t.append(tids[1])
+        else:
+            n_test = max(1, round(n * TEST_RATIO))
+            n_dev  = max(1, round(n * DEV_RATIO))
+            while n_test + n_dev >= n:           # always leave train >= 1
+                if n_dev > 1:
+                    n_dev -= 1
+                elif n_test > 1:
+                    n_test -= 1
+                else:
+                    break
+            test_t  += tids[:n_test]
+            dev_t   += tids[n_test:n_test + n_dev]
+            train_t += tids[n_test + n_dev:]
 
-        target_test = total * TEST_RATIO
-        target_dev  = total * DEV_RATIO
+    def collect(tids):
+        out = []
+        for tid in tids:
+            out.extend(by_template[tid])
+        random.shuffle(out)
+        return out
 
-        # A pattern bigger than this can't be held out wholesale without
-        # blowing past a split's target share on its own — give it
-        # proportional example-level treatment instead.
-        HOLDOUT_CAP = max(target_test, target_dev) * 1.5
-
-        holdout_candidates = [(qt, ps) for qt, ps in pattern_items if len(ps) <= HOLDOUT_CAP]
-        oversized          = [(qt, ps) for qt, ps in pattern_items if len(ps) >  HOLDOUT_CAP]
-
-        # Largest-first among holdout-eligible patterns, so each one lands
-        # where the deficit is greatest instead of arbitrary shuffle order.
-        holdout_candidates.sort(key=lambda kv: len(kv[1]), reverse=True)
-
-        tr, dv, te = [], [], []
-        test_n = dev_n = 0
-
-        for _, ps in holdout_candidates:
-            test_deficit = target_test - test_n
-            dev_deficit  = target_dev - dev_n
-
-            if test_deficit <= 0 and dev_deficit <= 0:
-                tr.extend(ps)
-            elif test_deficit >= dev_deficit:
-                te.extend(ps)
-                test_n += len(ps)
-            else:
-                dv.extend(ps)
-                dev_n += len(ps)
-
-        # Oversized/dominant patterns: proportional example-level split
-        # (not held out wholesale) so every split gets representative
-        # coverage of these common shapes.
-        for _, ps in oversized:
-            ps = ps[:]
-            random.shuffle(ps)
-            n = len(ps)
-            n_test_i = round(n * TEST_RATIO)
-            n_dev_i  = round(n * DEV_RATIO)
-            te.extend(ps[:n_test_i])
-            dv.extend(ps[n_test_i:n_test_i + n_dev_i])
-            tr.extend(ps[n_test_i + n_dev_i:])
-
-        return tr, dv, te
-
-    easy_pairs   = [p for p in all_pairs if p["difficulty"] == "easy"]
-    medium_pairs = [p for p in all_pairs if p["difficulty"] == "medium"]
-
-    tr_e, dv_e, te_e = split_tier(easy_pairs)
-    tr_m, dv_m, te_m = split_tier(medium_pairs)
-
-    train = tr_e + tr_m
-    dev   = dv_e + dv_m
-    test  = te_e + te_m
-
-    random.shuffle(train)
-    random.shuffle(dev)
-    random.shuffle(test)
-
-    return train, dev, test
-
+    return collect(train_t), collect(dev_t), collect(test_t)
 
 
 # ── Stats ──────────────────────────────────────────────────────────────────────
 
 def compute_stats(templates, all_pairs, train, dev, test):
-    easy_base   = sum(1 for t in templates if t["difficulty"] == "easy")
-    medium_base = sum(1 for t in templates if t["difficulty"] == "medium")
+    def tier(pairs, level):
+        return sum(1 for p in pairs if p["difficulty"] == level)
 
-    easy_aug   = sum(1 for p in all_pairs if p["difficulty"] == "easy")
-    medium_aug = sum(1 for p in all_pairs if p["difficulty"] == "medium")
-
+    train_types = {p["query_type"] for p in train}
     return {
         "base_templates": {
-            "easy":   easy_base,
-            "medium": medium_base,
+            "easy":   tier(templates, "easy"),
+            "medium": tier(templates, "medium"),
             "total":  len(templates),
         },
         "after_augmentation_dedup": {
-            "easy":   easy_aug,
-            "medium": medium_aug,
+            "easy":   tier(all_pairs, "easy"),
+            "medium": tier(all_pairs, "medium"),
             "total":  len(all_pairs),
+            "augmentation_ratio": round(len(all_pairs) / len(templates), 2),
         },
-        "splits": {
-            "train": len(train),
-            "dev":   len(dev),
-            "test":  len(test),
+        "splits": {"train": len(train), "dev": len(dev), "test": len(test)},
+        "templates_per_split": {
+            "train": len({p["base_template_id"] for p in train}),
+            "dev":   len({p["base_template_id"] for p in dev}),
+            "test":  len({p["base_template_id"] for p in test}),
         },
-        "train_easy":   sum(1 for p in train if p["difficulty"] == "easy"),
-        "train_medium": sum(1 for p in train if p["difficulty"] == "medium"),
-        "dev_easy":     sum(1 for p in dev   if p["difficulty"] == "easy"),
-        "dev_medium":   sum(1 for p in dev   if p["difficulty"] == "medium"),
-        "test_easy":    sum(1 for p in test  if p["difficulty"] == "easy"),
-        "test_medium":  sum(1 for p in test  if p["difficulty"] == "medium"),
+        "train_easy":   tier(train, "easy"),
+        "train_medium": tier(train, "medium"),
+        "dev_easy":     tier(dev, "easy"),
+        "dev_medium":   tier(dev, "medium"),
+        "test_easy":    tier(test, "easy"),
+        "test_medium":  tier(test, "medium"),
+        "query_types": {
+            "total":            len({p["query_type"] for p in all_pairs}),
+            "in_train":         len(train_types),
+            "dev_unseen_in_train":  sorted({p["query_type"] for p in dev}  - train_types),
+            "test_unseen_in_train": sorted({p["query_type"] for p in test} - train_types),
+        },
+        "sql_leakage": {
+            "dev_sql_also_in_train":  len({p["sql_query"] for p in dev}  & {p["sql_query"] for p in train}),
+            "test_sql_also_in_train": len({p["sql_query"] for p in test} & {p["sql_query"] for p in train}),
+        },
     }
 
 
@@ -433,66 +301,55 @@ def main():
     print("BanglaSQL Dataset Builder — Phase 2")
     print("=" * 60)
 
-    # 1. Load base templates
     with open(TEMPLATES_PATH, encoding="utf-8") as f:
         templates = json.load(f)
     print(f"\n[1/5] Loaded {len(templates)} base templates")
-    print(f"      Easy: {sum(1 for t in templates if t['difficulty']=='easy')}")
-    print(f"      Medium: {sum(1 for t in templates if t['difficulty']=='medium')}")
+    print(f"      Easy  : {sum(1 for t in templates if t['difficulty'] == 'easy')}")
+    print(f"      Medium: {sum(1 for t in templates if t['difficulty'] == 'medium')}")
 
-    # 2. Mark base templates
     for t in templates:
         t["is_augmented"] = False
+        t["base_template_id"] = t["template_id"]
 
-    # 3. Augment
-    all_pairs = list(templates)  # start with base
+    all_pairs = list(templates)
     for template in templates:
-        augmented = augment_template(template)
-        all_pairs.extend(augmented)
+        all_pairs.extend(augment_template(template))
+    print(f"\n[2/5] After augmentation: {len(all_pairs)} pairs")
 
-    print(f"\n[2/5] After augmentation: {len(all_pairs)} pairs "
-          f"(before deduplication)")
-
-    # 4. Deduplicate
     all_pairs = deduplicate(all_pairs)
-    print(f"\n[3/5] After deduplication: {len(all_pairs)} pairs")
-    print(f"      Easy:   {sum(1 for p in all_pairs if p['difficulty']=='easy')}")
-    print(f"      Medium: {sum(1 for p in all_pairs if p['difficulty']=='medium')}")
+    print(f"\n[3/5] After deduplication: {len(all_pairs)} pairs "
+          f"({len(all_pairs) / len(templates):.1f}x base)")
 
-    # 5. Quality warning
-    total = len(all_pairs)
-    if total < 500:
-        print(f"\n  [!] WARNING: Only {total} pairs. Quality > quantity for this "
-              f"dataset size -- this is acceptable.")
-    else:
-        print(f"\n  [OK] Dataset size ({total} pairs) is within target range.")
-
-    # 6. Split
     train, dev, test = split_dataset(all_pairs)
-    print(f"\n[4/5] Split:")
-    print(f"      Train : {len(train)} ({len(train)/total:.0%})")
-    print(f"      Dev   : {len(dev)}   ({len(dev)/total:.0%})")
-    print(f"      Test  : {len(test)}  ({len(test)/total:.0%})")
-    print(f"      (Test patterns held out entirely from train for generalization)")
-
-    # 7. Save
-    os.makedirs(DATA_DIR, exist_ok=True)
-
-    for split_name, split_data in [("train", train), ("dev", dev), ("test", test)]:
-        path = os.path.join(DATA_DIR, f"dataset_{split_name}.json")
-        with open(path, "w", encoding="utf-8") as f:
-            json.dump(split_data, f, ensure_ascii=False, indent=2)
-        print(f"\n[5/5] Saved {path}")
+    total = len(all_pairs)
+    print(f"\n[4/5] Split (by template, stratified by query_type):")
+    print(f"      Train : {len(train):4d} ({len(train)/total:.0%})")
+    print(f"      Dev   : {len(dev):4d} ({len(dev)/total:.0%})")
+    print(f"      Test  : {len(test):4d} ({len(test)/total:.0%})")
 
     stats = compute_stats(templates, all_pairs, train, dev, test)
+    unseen_dev  = stats["query_types"]["dev_unseen_in_train"]
+    unseen_test = stats["query_types"]["test_unseen_in_train"]
+    if unseen_dev or unseen_test:
+        print(f"\n  [!] Query types missing from train — dev: {unseen_dev}, test: {unseen_test}")
+    else:
+        print(f"\n  [OK] All {stats['query_types']['total']} query types present in train.")
+    print(f"  [OK] Test SQL queries also seen in train: "
+          f"{stats['sql_leakage']['test_sql_also_in_train']} (0 = no leakage)")
+
+    os.makedirs(DATA_DIR, exist_ok=True)
+    for name, data in [("train", train), ("dev", dev), ("test", test)]:
+        path = os.path.join(DATA_DIR, f"dataset_{name}.json")
+        with open(path, "w", encoding="utf-8") as f:
+            json.dump(data, f, ensure_ascii=False, indent=2)
+        print(f"\n[5/5] Saved {path}")
+
     stats_path = os.path.join(DATA_DIR, "dataset_stats.json")
     with open(stats_path, "w", encoding="utf-8") as f:
         json.dump(stats, f, ensure_ascii=False, indent=2)
-
     print(f"\n      Saved stats: {stats_path}")
+
     print("\n" + "=" * 60)
-    print("Dataset Stats Summary")
-    print("=" * 60)
     print(json.dumps(stats, ensure_ascii=False, indent=2))
     print("=" * 60)
     print("\nPhase 2 COMPLETE — dataset ready for Phase 3 model training.")

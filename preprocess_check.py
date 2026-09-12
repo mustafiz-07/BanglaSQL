@@ -25,31 +25,16 @@ Outputs a report and saves normalized datasets back to data/.
 
 import json
 import os
-import unicodedata
-from collections import Counter
 
-# ── Config ─────────────────────────────────────────────────────────────────────
-DATA_DIR   = os.path.join(os.path.dirname(os.path.abspath(__file__)), "data")
+from common import DATA_DIR, DEFAULT_SCHEMA_STRING, format_input, normalize_bangla
+
 MODEL_NAME = "csebuetnlp/banglat5"          # primary
 FALLBACK   = "google/mt5-small"             # fallback
 
-# Schema string used during training — same function will be used in train.py
-SCHEMA_STRING = (
-    "table: departments(dept_id, dept_name, building, phone) | "
-    "table: instructors(instructor_id, first_name, last_name, email, dept_id, designation, joining_year) | "
-    "table: students(student_id, first_name, last_name, email, dept_id, year_of_admission, cgpa) | "
-    "table: courses(course_id, course_code, course_name, credits, dept_id, instructor_id, semester) | "
-    "table: enrollments(enrollment_id, student_id, course_id, grade, grade_point) | "
-    "table: attendance(attendance_id, student_id, course_id, date, status)"
-)
+SCHEMA_STRING = DEFAULT_SCHEMA_STRING
 
 
 # ── 1. Unicode Normalization ────────────────────────────────────────────────────
-
-def normalize_bangla(text: str) -> str:
-    """Apply NFC Unicode normalization to ensure consistent Bangla representation."""
-    return unicodedata.normalize("NFC", str(text).strip())
-
 
 def normalize_dataset_file(path: str) -> list[dict]:
     with open(path, encoding="utf-8") as f:
@@ -121,7 +106,7 @@ def profile_sequence_lengths(tokenizer, pairs: list[dict]):
     output_lengths = []
 
     for pair in pairs:
-        inp = f"translate Bangla to SQL: {normalize_bangla(pair['bangla_question'])} </s> {SCHEMA_STRING}"
+        inp = format_input(pair["bangla_question"], SCHEMA_STRING)
         out = pair["sql_query"]
 
         inp_ids = tokenizer(inp, return_tensors=None)["input_ids"]
