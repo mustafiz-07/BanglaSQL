@@ -33,6 +33,12 @@ FALLBACK   = "google/mt5-small"             # fallback
 
 SCHEMA_STRING = DEFAULT_SCHEMA_STRING
 
+# The database is fixed, so the linearized schema is identical in every example
+# and carries no conditional signal; it was ~220 of ~240 input tokens of English
+# identifiers that BanglaT5's Bangla-centric vocabulary fragments heavily.
+INCLUDE_SCHEMA = False
+INPUT_CONFIG   = {"include_schema": INCLUDE_SCHEMA, "schema_string": SCHEMA_STRING}
+
 
 # ── 1. Unicode Normalization ────────────────────────────────────────────────────
 
@@ -106,7 +112,7 @@ def profile_sequence_lengths(tokenizer, pairs: list[dict]):
     output_lengths = []
 
     for pair in pairs:
-        inp = format_input(pair["bangla_question"], SCHEMA_STRING)
+        inp = format_input(pair["bangla_question"], INPUT_CONFIG)
         out = pair["sql_query"]
 
         inp_ids = tokenizer(inp, return_tensors=None)["input_ids"]
@@ -128,7 +134,7 @@ def profile_sequence_lengths(tokenizer, pairs: list[dict]):
         return p95
 
     print("\n  Sequence Length Profile (over train + dev pairs):")
-    in_p95  = stats(input_lengths,  "Input (question + schema)")
+    in_p95  = stats(input_lengths,  "Model input" + (" (question + schema)" if INCLUDE_SCHEMA else " (question only)"))
     out_p95 = stats(output_lengths, "Output (SQL query)")
 
     recommended_in  = min(512, max(128, ((in_p95  // 64) + 1) * 64))
@@ -230,6 +236,7 @@ def main():
         "max_input_length":   rec_in,
         "max_target_length":  rec_out,
         "schema_string":      SCHEMA_STRING,
+        "include_schema":     INCLUDE_SCHEMA,
         "bt5_coverage":       round(bt5_cov, 4),
         "mt5_coverage":       round(mt5_cov, 4),
     }

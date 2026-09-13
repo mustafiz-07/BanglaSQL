@@ -1,22 +1,25 @@
 """
 BanglaSQL — Dataset Builder (Phase 2)
 
-Loads base templates, augments via rule-based Bangla paraphrasing, deduplicates,
-and produces train/dev/test splits.
+Loads base templates, generates value-slot variants, augments via rule-based
+Bangla paraphrasing, deduplicates, and produces train/dev/test splits.
+
+Two kinds of augmentation, doing different jobs:
+  - Value-slot variants swap one literal (department, CGPA/year threshold, grade,
+    semester, course, LIMIT) consistently in the question and the SQL. They add
+    new SQL *targets*. Without them the 107 training templates gave the model
+    just 107 distinct SQL strings to recall; the first run memorised them (train
+    loss 0.01, dev loss rising from epoch 3) and 49 of 66 invalid test queries
+    were schema-grounding errors such as `students WHERE grade = ...`.
+  - Paraphrases (synonyms + register frames) vary only the Bangla wording.
 
 Split strategy — template-level holdout, stratified by query_type:
-  Every augmented variant stays with its base template, so no paraphrase of a
-  training question can leak into dev/test. Templates are then split *within*
-  each query_type, which guarantees train sees every SQL shape while dev/test
-  consist entirely of unseen templates (new SQL + new Bangla).
+  Every variant (value or paraphrase) stays with its base template, so nothing
+  derived from a training template can reach dev/test. Templates are split
+  within each query_type, so train sees every SQL shape while dev/test consist
+  entirely of unseen templates.
 
-  The previous strategy held out whole query_types, leaving dev/test with
-  patterns (select_all, order_by, limit, select_distinct, ...) that never
-  appeared in train. Exact match on those is unreachable by construction, and
-  because early stopping monitors eval_exact_match, training was being steered
-  by a metric pinned near zero.
-
-Run:
+Run (after create_database.py — value variants are checked against the DB):
     python build_dataset.py
 
 Outputs:
@@ -27,10 +30,14 @@ Outputs:
 """
 
 import json
-import random
 import os
+import random
+import re
+import sqlite3
 from collections import defaultdict
 from copy import deepcopy
+
+from common import DB_PATH
 
 # ── Reproducibility ────────────────────────────────────────────────────────────
 SEED = 42
@@ -40,9 +47,9 @@ random.seed(SEED)
 DATA_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "data")
 TEMPLATES_PATH = os.path.join(DATA_DIR, "templates.json")
 
-# 5 paraphrases per template keeps the corpus near the plan's 800-1000 target
-# without diluting it with near-identical surface variants.
-MAX_PARAPHRASES_PER_TEMPLATE = 5
+MAX_PARAPHRASES_PER_TEMPLATE  = 5
+VALUE_VARIANTS_PER_TEMPLATE   = 3
+PARAPHRASES_PER_VALUE_VARIANT = 2
 TRAIN_RATIO = 0.70
 DEV_RATIO   = 0.15
 TEST_RATIO  = 0.15
@@ -51,8 +58,7 @@ TEST_RATIO  = 0.15
 # Every entry must be meaning-preserving and grammatical in place. Substitutions
 # that shift meaning (গ্রেড→মার্ক), change register to Sadhu (ভর্তি হইয়াছে), or
 # require the rest of the clause to be rewritten (বেশি→ঊর্ধ্বে, which needs a
-# different postposition) are deliberately excluded — they were producing
-# question/SQL pairs that no longer matched.
+# different postposition) are deliberately excluded.
 
 SYNONYMS = {
     # request verbs
@@ -118,15 +124,52 @@ SYNONYMS = {
 }
 
 # ── Register frames ────────────────────────────────────────────────────────────
-# Applied by sentence type. Imperative politeness markers (অনুগ্রহ করে / দয়া করে)
-# only fit commands ending in "।"; prefixing them onto a "কত?" question is
-# ungrammatical, which is what the old shared frame list was producing.
+# Imperative politeness markers (অনুগ্রহ করে / দয়া করে) only fit commands ending
+# in "।"; prefixing them onto a "কত?" question is ungrammatical.
 
 COMMAND_FRAMES  = ["অনুগ্রহ করে, ", "দয়া করে ", "ডাটাবেস থেকে "]
 QUESTION_FRAMES = ["আমি জানতে চাই, ", "বলো তো, ", "একটু বলো, "]
 
+# ── Value slots ────────────────────────────────────────────────────────────────
+# Only literals whose Bangla surface form can be located unambiguously are used.
+# Attendance status and designations are left out on purpose: অনুপস্থিত contains
+# উপস্থিত and সহকারী অধ্যাপক contains অধ্যাপক, so a swap could hit the wrong word.
 
-# ── Core augmentation ──────────────────────────────────────────────────────────
+BN_DIGITS = str.maketrans("0123456789", "০১২৩৪৫৬৭৮৯")
+
+DEPARTMENTS = {  # SQL value -> Bangla surface forms, the one used for new questions first
+    "Computer Science and Engineering":      ["কম্পিউটার সায়েন্স"],
+    "Electrical and Electronic Engineering": ["EEE", "ইইই"],
+    "Mathematics":             ["গণিত"],
+    "Physics":                 ["পদার্থবিজ্ঞান"],
+    "Chemistry":               ["রসায়ন"],
+    "English":                 ["ইংরেজি"],
+    "Economics":               ["অর্থনীতি"],
+    "Business Administration": ["ব্যবসায় প্রশাসন"],
+    "Civil Engineering":       ["সিভিল ইঞ্জিনিয়ারিং"],
+    "Mechanical Engineering":  ["মেকানিক্যাল ইঞ্জিনিয়ারিং"],
+}
+
+NUMERIC_POOLS = {  # SQL column (or alias) -> plausible thresholds, as written in SQL
+    "cgpa":              ["2.5", "3.0", "3.25", "3.5", "3.75"],
+    "avg_cgpa":          ["2.75", "3.0", "3.25"],
+    "grade_point":       ["2.0", "2.5", "3.0", "3.5"],
+    "avg_gp":            ["2.5", "3.0", "3.5"],
+    "year_of_admission": ["2020", "2021", "2022", "2023"],
+    "joining_year":      ["2005", "2010", "2015", "2018"],
+}
+EQUALITY_COLUMNS = {"year_of_admission", "joining_year"}
+LIMIT_POOL = ["3", "5", "10"]
+
+LATIN_POOLS = {  # literals written in Latin script inside the Bangla question
+    "grade":       ["A+", "A", "B+", "B", "F"],
+    "semester":    ["Spring 2023", "Fall 2023", "Spring 2024", "Summer 2024", "Fall 2024"],
+    "course_name": ["Data Structures", "Algorithms", "Database Systems", "Operating Systems",
+                    "Computer Networks", "Machine Learning", "Digital Electronics", "Thermodynamics"],
+}
+
+
+# ── Paraphrase augmentation ────────────────────────────────────────────────────
 
 def apply_synonyms(question: str, n: int = 3) -> list[str]:
     """Return up to n variants, each swapping one synonym.
@@ -153,12 +196,12 @@ def apply_frames(question: str) -> list[str]:
     return [f"{frame}{question}" for frame in frames]
 
 
-def augment_template(template: dict) -> list[dict]:
-    """Produce up to MAX_PARAPHRASES_PER_TEMPLATE variants of one template."""
+def augment_template(template: dict, max_variants: int) -> list[dict]:
+    """Produce up to max_variants paraphrases of one question–SQL pair."""
     base_q = template["bangla_question"]
 
-    # Synonyms first: they vary the content words the model must actually ground
-    # onto schema elements. Frames only vary the wrapper.
+    # Synonyms first: they vary the content words the model must ground onto
+    # schema elements. Frames only vary the wrapper.
     candidates = apply_synonyms(base_q, n=3) + apply_frames(base_q)
 
     seen = {base_q}
@@ -170,14 +213,108 @@ def augment_template(template: dict) -> list[dict]:
             unique.append(q)
 
     results = []
-    for i, q in enumerate(unique[:MAX_PARAPHRASES_PER_TEMPLATE], start=1):
+    for i, q in enumerate(unique[:max_variants], start=1):
         variant = deepcopy(template)
         variant["template_id"] = f"{template['template_id']}_aug{i:02d}"
-        variant["base_template_id"] = template["template_id"]
         variant["bangla_question"] = q
         variant["is_augmented"] = True
         results.append(variant)
     return results
+
+
+# ── Value-slot augmentation ────────────────────────────────────────────────────
+
+def _single_match(pattern: str, text: str):
+    matches = list(re.finditer(pattern, text))
+    return matches[0] if len(matches) == 1 else None
+
+
+def find_value_slots(question: str, sql: str) -> list[tuple]:
+    """Locate literals present in both the SQL and, recognisably, the question.
+
+    Returns (sql_span, question_span, old_value, pool, render) tuples; render maps
+    a pool value to its surface form in the question. A literal is used only when
+    it occurs exactly once on each side, so a swap can never touch another token.
+    """
+    # Blank out quoted strings (same length) so numbers inside them are ignored.
+    masked = re.sub(r"'[^']*'", lambda m: "'" + "_" * (len(m.group()) - 2) + "'", sql)
+    slots = []
+
+    def numeric_slot(value, sql_span, pool):
+        if len(re.findall(rf"(?<![\w.]){re.escape(value)}(?![\w.])", masked)) != 1:
+            return
+        bn = re.escape(value.translate(BN_DIGITS))
+        qm = _single_match(rf"(?<![০-৯.]){bn}(?!\.?[০-৯])", question)
+        if qm:
+            slots.append((sql_span, qm.span(), value, pool, lambda v: v.translate(BN_DIGITS)))
+
+    for m in re.finditer(r"(?:\b\w+\.)?(\w+)\s*(>=|<=|>|<|=)\s*(\d+(?:\.\d+)?)\b", masked):
+        column, op, value = m.group(1).lower(), m.group(2), m.group(3)
+        pool = NUMERIC_POOLS.get(column)
+        if pool and (op != "=" or column in EQUALITY_COLUMNS):
+            numeric_slot(value, m.span(3), pool)
+
+    for m in re.finditer(r"\bLIMIT\s+(\d+)\b", masked, re.IGNORECASE):
+        if m.group(1) != "1":  # LIMIT 1 comes from সবচেয়ে/সর্বোচ্চ, not a number in the question
+            numeric_slot(m.group(1), m.span(1), LIMIT_POOL)
+
+    for m in re.finditer(r"(?:\b\w+\.)?(\w+)\s*=\s*'([^']*)'", sql):
+        column, value = m.group(1).lower(), m.group(2)
+        if sql.count(f"'{value}'") != 1:
+            continue
+        if column == "dept_name" and value in DEPARTMENTS:
+            for form in DEPARTMENTS[value]:
+                qm = _single_match(rf"(?<![ঀ-৿A-Za-z]){re.escape(form)}", question)
+                if qm:
+                    slots.append((m.span(2), qm.span(), value, list(DEPARTMENTS),
+                                  lambda v: DEPARTMENTS[v][0]))
+                    break
+        elif column in LATIN_POOLS:
+            qm = _single_match(rf"(?<![A-Za-z0-9+\-]){re.escape(value)}(?![A-Za-z0-9+\-])", question)
+            if qm:
+                slots.append((m.span(2), qm.span(), value, LATIN_POOLS[column], lambda v: v))
+
+    return slots
+
+
+def value_variants(template: dict, known_sql: set, con: sqlite3.Connection) -> list[dict]:
+    """New question–SQL pairs from one template, each with a single literal swapped.
+
+    A variant is kept only if its SQL executes and returns rows, and its SQL is not
+    already present anywhere (base templates or earlier variants) — the latter keeps
+    a train variant from reproducing a held-out template's query.
+    """
+    question, sql = template["bangla_question"], template["sql_query"]
+    candidates = [
+        (sql_span, q_span, new, render)
+        for sql_span, q_span, old, pool, render in find_value_slots(question, sql)
+        for new in pool
+        if new != old
+    ]
+    random.shuffle(candidates)
+
+    variants = []
+    for sql_span, q_span, new, render in candidates:
+        if len(variants) >= VALUE_VARIANTS_PER_TEMPLATE:
+            break
+        new_sql = sql[:sql_span[0]] + new + sql[sql_span[1]:]
+        if new_sql in known_sql:
+            continue
+        try:
+            if not con.execute(new_sql).fetchall():
+                continue
+        except sqlite3.Error:
+            continue
+        known_sql.add(new_sql)
+
+        variant = deepcopy(template)
+        variant["template_id"] = f"{template['template_id']}_v{len(variants) + 1}"
+        variant["bangla_question"] = question[:q_span[0]] + render(new) + question[q_span[1]:]
+        variant["sql_query"] = new_sql
+        variant["is_augmented"] = True
+        variant["is_value_variant"] = True
+        variants.append(variant)
+    return variants
 
 
 def deduplicate(pairs: list[dict]) -> list[dict]:
@@ -197,15 +334,11 @@ def split_dataset(all_pairs: list[dict]):
     """Split by base template, stratified by query_type.
 
     Within each query_type the *templates* are partitioned 70/15/15, then every
-    augmented variant follows its base template into that split. This gives two
-    properties the old split lacked:
-      - train contains at least one template of every query_type, so no SQL
-        shape is unreachable at evaluation time;
-      - dev/test templates are entirely unseen, so scores measure generalization
-        to new questions rather than memorized paraphrases.
+    variant follows its base template into that split. Train therefore contains
+    every query_type, and dev/test templates are entirely unseen.
 
     Query types with a single template go wholly to train — holding out the only
-    example of a shape would just make it unlearnable again.
+    example of a shape would make it unlearnable.
     """
     by_template = defaultdict(list)
     for pair in all_pairs:
@@ -252,9 +385,12 @@ def split_dataset(all_pairs: list[dict]):
 
 # ── Stats ──────────────────────────────────────────────────────────────────────
 
-def compute_stats(templates, all_pairs, train, dev, test):
+def compute_stats(templates, value_pairs, all_pairs, train, dev, test):
     def tier(pairs, level):
         return sum(1 for p in pairs if p["difficulty"] == level)
+
+    def unique_sql(pairs):
+        return len({p["sql_query"] for p in pairs})
 
     train_types = {p["query_type"] for p in train}
     return {
@@ -263,6 +399,7 @@ def compute_stats(templates, all_pairs, train, dev, test):
             "medium": tier(templates, "medium"),
             "total":  len(templates),
         },
+        "value_slot_variants": len(value_pairs),
         "after_augmentation_dedup": {
             "easy":   tier(all_pairs, "easy"),
             "medium": tier(all_pairs, "medium"),
@@ -274,6 +411,11 @@ def compute_stats(templates, all_pairs, train, dev, test):
             "train": len({p["base_template_id"] for p in train}),
             "dev":   len({p["base_template_id"] for p in dev}),
             "test":  len({p["base_template_id"] for p in test}),
+        },
+        "unique_sql_per_split": {
+            "train": unique_sql(train),
+            "dev":   unique_sql(dev),
+            "test":  unique_sql(test),
         },
         "train_easy":   tier(train, "easy"),
         "train_medium": tier(train, "medium"),
@@ -301,6 +443,9 @@ def main():
     print("BanglaSQL Dataset Builder — Phase 2")
     print("=" * 60)
 
+    if not os.path.exists(DB_PATH):
+        raise SystemExit(f"Database not found: {DB_PATH}\nRun: python create_database.py")
+
     with open(TEMPLATES_PATH, encoding="utf-8") as f:
         templates = json.load(f)
     print(f"\n[1/5] Loaded {len(templates)} base templates")
@@ -311,13 +456,22 @@ def main():
         t["is_augmented"] = False
         t["base_template_id"] = t["template_id"]
 
-    all_pairs = list(templates)
+    con = sqlite3.connect(f"file:{DB_PATH}?mode=ro", uri=True)
+    known_sql = {t["sql_query"] for t in templates}
+    value_pairs = []
     for template in templates:
-        all_pairs.extend(augment_template(template))
-    print(f"\n[2/5] After augmentation: {len(all_pairs)} pairs")
+        value_pairs.extend(value_variants(template, known_sql, con))
+    con.close()
+    print(f"\n[2/5] Value-slot variants: {len(value_pairs)} new question–SQL pairs")
+
+    all_pairs = list(templates) + value_pairs
+    for template in templates:
+        all_pairs.extend(augment_template(template, MAX_PARAPHRASES_PER_TEMPLATE))
+    for variant in value_pairs:
+        all_pairs.extend(augment_template(variant, PARAPHRASES_PER_VALUE_VARIANT))
 
     all_pairs = deduplicate(all_pairs)
-    print(f"\n[3/5] After deduplication: {len(all_pairs)} pairs "
+    print(f"\n[3/5] After paraphrasing + dedup: {len(all_pairs)} pairs "
           f"({len(all_pairs) / len(templates):.1f}x base)")
 
     train, dev, test = split_dataset(all_pairs)
@@ -327,13 +481,14 @@ def main():
     print(f"      Dev   : {len(dev):4d} ({len(dev)/total:.0%})")
     print(f"      Test  : {len(test):4d} ({len(test)/total:.0%})")
 
-    stats = compute_stats(templates, all_pairs, train, dev, test)
+    stats = compute_stats(templates, value_pairs, all_pairs, train, dev, test)
     unseen_dev  = stats["query_types"]["dev_unseen_in_train"]
     unseen_test = stats["query_types"]["test_unseen_in_train"]
     if unseen_dev or unseen_test:
         print(f"\n  [!] Query types missing from train — dev: {unseen_dev}, test: {unseen_test}")
     else:
         print(f"\n  [OK] All {stats['query_types']['total']} query types present in train.")
+    print(f"  [OK] Distinct SQL targets in train: {stats['unique_sql_per_split']['train']}")
     print(f"  [OK] Test SQL queries also seen in train: "
           f"{stats['sql_leakage']['test_sql_also_in_train']} (0 = no leakage)")
 

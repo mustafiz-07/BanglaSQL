@@ -14,18 +14,22 @@ Models: csebuetnlp/banglat5 (primary) | google/mt5-small (fallback)
 7. !python evaluate.py
 
 == Fallback trigger ==
-If BanglaT5 does not reach >20% execution accuracy on the dev set after 10
-epochs, set "model_name" to "google/mt5-small" in data/train_config.json and
-retrain.
+If BanglaT5 does not reach >20% dev execution accuracy after 10 epochs, set
+"model_name" to "google/mt5-small" in data/train_config.json and retrain.
 
-== Notes on two non-obvious choices ==
+== Notes on non-obvious choices ==
 - tie_word_embeddings is left alone. T5 physically shares one tensor between
   embed_tokens and lm_head; flipping the config flag without actually untying
   the weights makes safetensors save a checkpoint with those tensors missing,
   and they are randomly re-initialised on reload — a silently corrupted model.
-  The HF warning this would silence is cosmetic.
 - fp16 stays off. T5-family activations overflow in standard FP16 and produce
   NaN losses.
+- The best checkpoint is chosen on dev execution accuracy, not exact match.
+  Exact match rejects semantically identical SQL (other alias or column order),
+  so the "best" epoch was partly decided by surface form.
+- Dev evaluation during training decodes greedily. Beam search there cost about
+  a third of every epoch; evaluate.py applies beams plus execution-guided
+  decoding to the final checkpoint.
 """
 
 import json
@@ -47,7 +51,10 @@ from transformers import (
     EarlyStoppingCallback,
 )
 
-from common import format_input, load_config, load_split
+from common import (
+    DB_PATH, format_input, load_config, load_split, normalize_sql,
+    open_readonly_db, results_match, run_sql, save_model_config,
+)
 
 # ── Reproducibility ────────────────────────────────────────────────────────────
 SEED = 42
@@ -71,35 +78,32 @@ TRAIN_CONFIG      = load_config()
 MODEL_NAME        = TRAIN_CONFIG["model_name"]
 MAX_INPUT_LENGTH  = int(TRAIN_CONFIG["max_input_length"])
 MAX_TARGET_LENGTH = int(TRAIN_CONFIG["max_target_length"])
-SCHEMA_STRING     = TRAIN_CONFIG["schema_string"]
 
 # ── Hyperparameters ────────────────────────────────────────────────────────────
-# Sized for ~640 training pairs: at batch 8 that is ~80 optimizer steps/epoch, so
-# 40 epochs gives ~3.2k steps — enough for BanglaT5 to converge on this task.
-# Gradient accumulation is off; with a dataset this small, more frequent updates
-# converge faster than a larger effective batch.
+# The first fixed-split run peaked at epoch 7 and early-stopped at 13, with dev
+# loss rising from epoch 3 while train loss fell to 0.01. 25 epochs covers that
+# window with margin; the extra capacity is spent on more distinct SQL targets
+# (value-slot augmentation) rather than more passes over the same ones.
 BATCH_SIZE       = 8
-EVAL_BATCH_SIZE  = 16
+EVAL_BATCH_SIZE  = 32
 GRAD_ACCUM_STEPS = 1
 LEARNING_RATE    = 3e-4
-NUM_EPOCHS       = 40
+NUM_EPOCHS       = 25
 WEIGHT_DECAY     = 0.01
 SAVE_TOTAL_LIMIT = 2
-LABEL_SMOOTHING  = 0.0    # off: exact SQL token generation needs sharp probabilities
+LABEL_SMOOTHING  = 0.0
 
-EARLY_STOPPING_PATIENCE      = 6
-MIN_EPOCHS_BEFORE_EARLY_STOP = 8
+EARLY_STOPPING_PATIENCE      = 5
+MIN_EPOCHS_BEFORE_EARLY_STOP = 6
 
-# Eval-time beams match the beams used at inference so eval_exact_match predicts
-# real-world behaviour.
-EVAL_NUM_BEAMS = 4
+EVAL_NUM_BEAMS = 1
 
 
 class BanglaSQLDataset(Dataset):
-    def __init__(self, pairs: list[dict], tokenizer, schema: str):
+    def __init__(self, pairs: list[dict], tokenizer, config: dict):
         self.pairs     = pairs
         self.tokenizer = tokenizer
-        self.schema    = schema
+        self.config    = config
 
     def __len__(self):
         return len(self.pairs)
@@ -107,7 +111,7 @@ class BanglaSQLDataset(Dataset):
     def __getitem__(self, idx):
         pair = self.pairs[idx]
         model_inputs = self.tokenizer(
-            format_input(pair["bangla_question"], self.schema),
+            format_input(pair["bangla_question"], self.config),
             max_length=MAX_INPUT_LENGTH,
             truncation=True,
             padding=False,
@@ -125,9 +129,8 @@ class BanglaSQLDataset(Dataset):
 class WarmupEarlyStoppingCallback(EarlyStoppingCallback):
     """EarlyStoppingCallback that ignores evaluations before `min_epochs`.
 
-    exact_match reads 0.0 for the first several epochs while the model is still
-    learning SQL syntax, so plain patience would burn through and stop training
-    long before convergence.
+    Accuracy reads 0.0 for the first epochs while the model is still learning SQL
+    syntax, so plain patience would burn through and stop long before convergence.
     """
 
     def __init__(self, early_stopping_patience=4, early_stopping_threshold=0.0, min_epochs=0):
@@ -147,8 +150,8 @@ class WarmupEarlyStoppingCallback(EarlyStoppingCallback):
         super().on_evaluate(args, state, control, metrics, **kwargs)
 
 
-def compute_metrics(eval_preds, tokenizer):
-    """Exact match on whitespace-normalized SQL strings."""
+def compute_metrics(eval_preds, tokenizer, con):
+    """Exact match and execution accuracy against the database."""
     preds, labels = eval_preds
     if isinstance(preds, tuple):
         preds = preds[0]
@@ -160,21 +163,35 @@ def compute_metrics(eval_preds, tokenizer):
     preds  = np.where((preds != -100) & (preds >= 0), preds, pad_id)
     labels = np.where((labels != -100) & (labels >= 0), labels, pad_id)
 
-    decoded_preds  = [" ".join(p.split()) for p in tokenizer.batch_decode(preds, skip_special_tokens=True)]
-    decoded_labels = [" ".join(l.split()) for l in tokenizer.batch_decode(labels, skip_special_tokens=True)]
+    decoded_preds  = tokenizer.batch_decode(preds, skip_special_tokens=True)
+    decoded_labels = tokenizer.batch_decode(labels, skip_special_tokens=True)
 
     total = len(decoded_preds)
     if total == 0:
-        return {"exact_match": 0.0}
-    matches = sum(p == l for p, l in zip(decoded_preds, decoded_labels))
-    return {"exact_match": round(matches / total, 4)}
+        return {"exact_match": 0.0, "execution_accuracy": 0.0}
+
+    exact = executed = 0
+    for pred, gold in zip(decoded_preds, decoded_labels):
+        exact += normalize_sql(pred) == normalize_sql(gold)
+        gold_rows, _ = run_sql(con, gold)
+        pred_rows, _ = run_sql(con, pred)
+        executed += results_match(gold_rows, pred_rows, gold)
+
+    return {
+        "exact_match":        round(exact / total, 4),
+        "execution_accuracy": round(executed / total, 4),
+    }
 
 
 def main():
+    if not os.path.exists(DB_PATH):
+        raise SystemExit(f"Database not found: {DB_PATH}\nRun: python create_database.py")
+
     logger.info("=" * 60)
     logger.info("BanglaSQL — Phase 3: Training")
     logger.info("=" * 60)
     logger.info(f"Model      : {MODEL_NAME}")
+    logger.info(f"Input      : question{' + schema' if TRAIN_CONFIG['include_schema'] else ' only'}")
     logger.info(f"Max in/out : {MAX_INPUT_LENGTH}/{MAX_TARGET_LENGTH}")
     logger.info(f"Batch      : {BATCH_SIZE} x{GRAD_ACCUM_STEPS} accum")
     logger.info(f"Epochs     : {NUM_EPOCHS}   LR: {LEARNING_RATE}")
@@ -199,8 +216,8 @@ def main():
     logger.info(f"  Train: {len(train_pairs)} pairs")
     logger.info(f"  Dev  : {len(dev_pairs)} pairs")
 
-    train_dataset = BanglaSQLDataset(train_pairs, tokenizer, SCHEMA_STRING)
-    dev_dataset   = BanglaSQLDataset(dev_pairs, tokenizer, SCHEMA_STRING)
+    train_dataset = BanglaSQLDataset(train_pairs, tokenizer, TRAIN_CONFIG)
+    dev_dataset   = BanglaSQLDataset(dev_pairs, tokenizer, TRAIN_CONFIG)
 
     data_collator = DataCollatorForSeq2Seq(
         tokenizer,
@@ -221,7 +238,7 @@ def main():
         "warmup_ratio": 0.1,
         "lr_scheduler_type": "linear",
         "load_best_model_at_end": True,
-        "metric_for_best_model": "eval_exact_match",
+        "metric_for_best_model": "eval_execution_accuracy",
         "greater_is_better": True,
         "save_total_limit": SAVE_TOTAL_LIMIT,
         "predict_with_generate": True,
@@ -247,13 +264,14 @@ def main():
         **{k: v for k, v in training_kwargs.items() if k in args_sig}
     )
 
+    con = open_readonly_db()
     trainer_kwargs = {
         "model": model,
         "args": training_args,
         "train_dataset": train_dataset,
         "eval_dataset": dev_dataset,
         "data_collator": data_collator,
-        "compute_metrics": lambda p: compute_metrics(p, tokenizer),
+        "compute_metrics": lambda p: compute_metrics(p, tokenizer, con),
         "callbacks": [
             WarmupEarlyStoppingCallback(
                 early_stopping_patience=EARLY_STOPPING_PATIENCE,
@@ -275,9 +293,9 @@ def main():
     best_model_dir = os.path.join(CHECKPOINTS, "best_model")
     trainer.save_model(best_model_dir)
     tokenizer.save_pretrained(best_model_dir)
+    save_model_config(TRAIN_CONFIG, best_model_dir)
     logger.info(f"Best model saved to: {best_model_dir}")
 
-    # Per-epoch loss/metric history for the report's training curves.
     history_path = os.path.join(LOGS_DIR, "train_history.json")
     with open(history_path, "w", encoding="utf-8") as f:
         json.dump(trainer.state.log_history, f, indent=2, default=float)
@@ -285,20 +303,22 @@ def main():
 
     logger.info("\nFinal dev set evaluation...")
     dev_metrics = trainer.evaluate()
+    con.close()
     with open(os.path.join(LOGS_DIR, "dev_metrics.json"), "w", encoding="utf-8") as f:
         json.dump(dev_metrics, f, indent=2, default=float)
 
-    best_em = dev_metrics.get("eval_exact_match", 0)
+    best_ex = dev_metrics.get("eval_execution_accuracy", 0)
     logger.info("\n" + "=" * 60)
     logger.info("Training complete.")
-    logger.info(f"  Dev exact_match : {best_em}")
-    logger.info(f"  Best model at   : {best_model_dir}")
+    logger.info(f"  Dev execution accuracy : {best_ex}")
+    logger.info(f"  Dev exact match        : {dev_metrics.get('eval_exact_match', 0)}")
+    logger.info(f"  Best model at          : {best_model_dir}")
     logger.info("=" * 60)
-    logger.info("Next: python evaluate.py   (execution accuracy on the test split)")
+    logger.info("Next: python evaluate.py   (beam + execution-guided decoding on the test split)")
 
-    if isinstance(best_em, (int, float)) and best_em < 0.20:
+    if isinstance(best_ex, (int, float)) and best_ex < 0.20:
         logger.warning(
-            "\n[FALLBACK TRIGGER] Dev exact_match < 20%. Consider setting "
+            "\n[FALLBACK TRIGGER] Dev execution accuracy < 20%. Consider setting "
             "\"model_name\" to \"google/mt5-small\" in data/train_config.json and retraining."
         )
 
