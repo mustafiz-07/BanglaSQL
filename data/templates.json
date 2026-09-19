@@ -256,7 +256,7 @@
       "courses"
     ],
     "query_type": "order_by",
-    "bangla_question": "কোর্সগুলোর কোড ও নাম ক্রেডিট অনুযায়ী অবরোহী ক্রমে সাজিয়ে দেখাও।",
+    "bangla_question": "ক্রেডিট অনুযায়ী অবরোহী ক্রমে সাজিয়ে কোর্সগুলোর কোড ও নাম দেখাও।",
     "sql_query": "SELECT course_code, course_name, credits FROM courses ORDER BY credits DESC;"
   },
   {
@@ -2079,7 +2079,7 @@
       "courses"
     ],
     "query_type": "multi_join_where_order",
-    "bangla_question": "A+ পাওয়া শিক্ষার্থীদের নাম ও কোর্সের নাম গ্রেড পয়েন্ট অনুযায়ী অবরোহী ক্রমে দাও।",
+    "bangla_question": "গ্রেড পয়েন্ট অনুযায়ী অবরোহী ক্রমে সাজিয়ে A+ পাওয়া শিক্ষার্থীদের নাম ও কোর্সের নাম দাও।",
     "sql_query": "SELECT s.first_name, s.last_name, c.course_name, e.grade_point FROM students s JOIN enrollments e ON s.student_id = e.student_id JOIN courses c ON e.course_id = c.course_id WHERE e.grade = 'A+' ORDER BY e.grade_point DESC;"
   },
   {
@@ -2115,7 +2115,7 @@
       "courses"
     ],
     "query_type": "multi_join_where_order",
-    "bangla_question": "উপস্থিত ছিল এমন শিক্ষার্থীদের নাম ও কোর্সের নাম তারিখ অনুযায়ী সাজিয়ে দাও।",
+    "bangla_question": "তারিখ অনুযায়ী সাজিয়ে উপস্থিত ছিল এমন শিক্ষার্থীদের নাম ও কোর্সের নাম দাও।",
     "sql_query": "SELECT s.first_name, s.last_name, c.course_name, a.date FROM students s JOIN attendance a ON s.student_id = a.student_id JOIN courses c ON a.course_id = c.course_id WHERE a.status = 'Present' ORDER BY a.date ASC;"
   },
   {
@@ -2322,7 +2322,7 @@
       "departments"
     ],
     "query_type": "join_where_order",
-    "bangla_question": "ইংরেজি বিভাগের কোর্সগুলোর নাম ও ক্রেডিট নাম অনুযায়ী সাজিয়ে দাও।",
+    "bangla_question": "ইংরেজি বিভাগের কোর্সগুলোর নাম ও ক্রেডিট বর্ণানুক্রমে সাজিয়ে দাও।",
     "sql_query": "SELECT c.course_name, c.credits FROM courses c JOIN departments d ON c.dept_id = d.dept_id WHERE d.dept_name = 'English' ORDER BY c.course_name ASC;"
   },
   {
@@ -2362,7 +2362,7 @@
       "students"
     ],
     "query_type": "order_by",
-    "bangla_question": "শিক্ষার্থীদের নাম ও ইমেইল CGPA অনুযায়ী আরোহী ক্রমে সাজাও।",
+    "bangla_question": "CGPA অনুযায়ী আরোহী ক্রমে সাজিয়ে শিক্ষার্থীদের নাম ও ইমেইল দাও।",
     "sql_query": "SELECT first_name, last_name, email FROM students ORDER BY cgpa ASC;"
   },
   {

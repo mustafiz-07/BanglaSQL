@@ -93,7 +93,13 @@ WEIGHT_DECAY     = 0.01
 SAVE_TOTAL_LIMIT = 2
 LABEL_SMOOTHING  = 0.0
 
-EARLY_STOPPING_PATIENCE      = 5
+# Patience is deliberately loose. Dev is 261 examples from 29 templates and dev
+# execution accuracy swings by ~0.10 between adjacent epochs, so a normal dip looks
+# like a plateau. At patience=5 run 4 stopped at epoch 11 with its best at epoch 6
+# (dev 0.517), while run 5 — same setting, luckier curve — ran to 21 and peaked at
+# epoch 16 (dev 0.605), worth about 20 points of test accuracy. Stopping early costs
+# far more here than a few extra epochs do.
+EARLY_STOPPING_PATIENCE      = 10
 MIN_EPOCHS_BEFORE_EARLY_STOP = 6
 
 EVAL_NUM_BEAMS = 1

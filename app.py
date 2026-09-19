@@ -19,7 +19,7 @@ import torch
 from transformers import AutoTokenizer, AutoModelForSeq2SeqLM
 
 from common import (
-    format_input, has_duplicate_select_columns, load_config, open_readonly_db, run_sql,
+    format_input, is_decoding_artifact, load_config, open_readonly_db, run_sql,
 )
 
 MODEL_DIR = "checkpoints/best_model"
@@ -95,7 +95,7 @@ def choose_sql(candidates: list[str], tables: dict) -> tuple[str, int]:
             if validate_sql(sql, tables) is None and run_sql(con, sql)[1] is None
         ]
         for rank, sql in usable:
-            if not has_duplicate_select_columns(sql):
+            if not is_decoding_artifact(sql):
                 return sql, rank
         if usable:
             return usable[0][1], usable[0][0]

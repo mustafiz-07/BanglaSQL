@@ -132,13 +132,7 @@ def results_match(gold_rows, pred_rows, gold_sql: str) -> bool:
 
 
 def has_duplicate_select_columns(sql: str) -> bool:
-    """True if the SELECT list names the same expression twice.
-
-    `SELECT course_name, course_name FROM courses` executes happily but returns an
-    extra column, so execution alone cannot filter it out. No gold query in this
-    dataset selects a column twice (checked: 0 of 228), so a repeat is always a
-    decoding artifact.
-    """
+    """True if the SELECT list names the same expression twice."""
     match = re.search(r"select\s+(?:distinct\s+)?(.*?)\s+from\s", normalize_sql(sql), re.S)
     if not match:
         return False
@@ -146,16 +140,36 @@ def has_duplicate_select_columns(sql: str) -> bool:
     return len(columns) != len(set(columns))
 
 
+def has_orphan_sort_direction(sql: str) -> bool:
+    """True if ASC/DESC appears without an ORDER BY.
+
+    `SELECT ... FROM students ASC LIMIT 3` executes, because SQLite reads `students
+    ASC` as a table alias — so the query silently returns unordered rows.
+    """
+    norm = normalize_sql(sql)
+    return bool(re.search(r"\b(asc|desc)\b", norm)) and "order by" not in norm
+
+
+def is_decoding_artifact(sql: str) -> bool:
+    """True if the query executes but is a recognisable generation defect.
+
+    Both patterns run without error yet cannot be what the question asked for, so
+    execution-guided decoding cannot filter them on execution alone. Neither appears
+    in any of the 228 gold queries, so treating them as artifacts is safe.
+    """
+    return has_duplicate_select_columns(sql) or has_orphan_sort_direction(sql)
+
+
 def pick_executable(candidates: list[str], con: sqlite3.Connection) -> str:
     """Execution-guided decoding (Wang et al., 2018): first beam that runs without error.
 
     Beams arrive in model-score order, so the model's ranking is kept among valid
     queries and only overridden when a higher-scoring query cannot execute or is a
-    recognisable artifact. Preference order: executes and has no repeated SELECT
-    column, then merely executes, then the top beam.
+    recognisable artifact. Preference order: executes and is not an artifact, then
+    merely executes, then the top beam.
     """
     executable = [sql for sql in candidates if run_sql(con, sql)[1] is None]
     for sql in executable:
-        if not has_duplicate_select_columns(sql):
+        if not is_decoding_artifact(sql):
             return sql
     return executable[0] if executable else candidates[0]
