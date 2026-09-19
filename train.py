@@ -80,14 +80,14 @@ MAX_INPUT_LENGTH  = int(TRAIN_CONFIG["max_input_length"])
 MAX_TARGET_LENGTH = int(TRAIN_CONFIG["max_target_length"])
 
 # ── Hyperparameters ────────────────────────────────────────────────────────────
-# The first fixed-split run peaked at epoch 7 and early-stopped at 13, with dev
-# loss rising from epoch 3 while train loss fell to 0.01. 25 epochs covers that
-# window with margin; the extra capacity is spent on more distinct SQL targets
-# (value-slot augmentation) rather than more passes over the same ones.
+# Runs peak around epoch 7-9, so 25 epochs with patience 5 covers the window.
+# LR is 2e-4 rather than 3e-4: at 3e-4 run 2 blew up at epoch 10 (dev loss
+# 0.22 -> 0.80, execution accuracy 0.54 -> 0.07) before recovering, which is a
+# wasted epoch and risks early stopping firing on the dip.
 BATCH_SIZE       = 8
 EVAL_BATCH_SIZE  = 32
 GRAD_ACCUM_STEPS = 1
-LEARNING_RATE    = 3e-4
+LEARNING_RATE    = 2e-4
 NUM_EPOCHS       = 25
 WEIGHT_DECAY     = 0.01
 SAVE_TOTAL_LIMIT = 2

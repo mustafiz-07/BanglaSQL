@@ -27,10 +27,10 @@ runtime`) so Step 2 clones the latest code rather than reusing an old checkout.
 
 ## Dataset
 
-165 hand-written Bangla question–SQL templates across two difficulty tiers, expanded
+228 hand-written Bangla question–SQL templates across two difficulty tiers, expanded
 in two ways:
 
-- **Value-slot variants (160)** — one literal swapped consistently in the question and
+- **Value-slot variants (210)** — one literal swapped consistently in the question and
   the SQL: department (গণিত ↔ `'Mathematics'`), CGPA / grade-point / year thresholds
   (৩.৫ ↔ `3.5`), grade, semester, course name, `LIMIT`. Each variant is a new SQL
   target, kept only if it executes and returns rows.
@@ -39,9 +39,16 @@ in two ways:
 
 | | train | dev | test |
 |---|---|---|---|
-| examples | 993 | 213 | 264 |
-| templates | 107 | 28 | 30 |
-| distinct SQL queries | 224 | 43 | 58 |
+| examples | 1382 | 318 | 297 |
+| templates | 160 | 34 | 34 |
+| distinct SQL queries | 301 | 72 | 65 |
+
+Template counts per `query_type` are deliberately balanced: after run 2, query types
+with ≤2 training templates averaged **31.4%** execution accuracy against **54.3%**
+for the rest, so 63 templates were added to the thin tail (`limit`, `order_by`,
+`order_by_limit`, `select_column`, `select_distinct`, `join`, `multi_join`,
+`aggregate_avg/max/min`, …). Every query type that appears in test now has at least
+3 training templates.
 
 **Split design — template-level holdout, stratified by `query_type`.** Every variant
 (value or paraphrase) stays with its base template, so nothing derived from a
@@ -106,14 +113,24 @@ is aborted after 5 seconds.
 | run | setup | test exec. acc. | exact match | validity |
 |---|---|---|---|---|
 | 1 | 642 train pairs (107 distinct SQL), schema in input, top-1 beam | 27.2% | 21.7% | 63.3% |
-| 2 | value-slot augmentation (224 distinct SQL), question-only input, exec-guided | *pending* | | |
+| 2 | value-slot augmentation (224 distinct SQL), question-only input, exec-guided | 45.5% | 23.5% | 81.8% |
+| 3 | +63 templates for thin query types (301 distinct SQL), LR 2e-4 | *pending* | | |
 
 Run 1 memorised its 107 SQL targets: train loss reached 0.01 while dev loss rose from
 epoch 3, and 49 of its 66 invalid queries were schema-grounding errors
-(`no such column`, e.g. `students WHERE grade = 'A+'` with the join dropped). Run 2's
-changes target exactly those failure modes. Run 2's test set is larger (264 vs 180)
-because value-slot variants of the 30 test templates are included; the test
-*templates* are the same 30, so the two runs are comparable at the template level.
+(`no such column`, e.g. `students WHERE grade = 'A+'` with the join dropped).
+
+Run 2 fixed most of that — execution accuracy 27.2% → 45.5%, validity 63.3% → 81.8%,
+and execution-guided decoding added 6.8 points over top-1 beam (38.6% → 45.5%). Its
+remaining failures were concentrated in query types with almost no training support:
+`limit`, `order_by`, `order_by_limit`, `select_column`, `select_distinct`, `join`,
+`multi_join`, `aggregate_avg` and `aggregate_max` all scored 0%, and each had only
+1–2 training templates. Run 3 addresses that with template coverage rather than
+model changes. Run 2 also showed an instability spike at epoch 10 (dev loss
+0.22 → 0.80) at LR 3e-4, hence the drop to 2e-4.
+
+Test-set sizes differ between runs because the split is regenerated from the
+templates, so compare at the query-type level rather than example counts.
 
 ## Demo
 
@@ -150,7 +167,7 @@ nlp/
 ├── evaluate.py                 # Execution accuracy + error analysis
 ├── app.py                      # Streamlit demo
 ├── data/
-│   ├── templates.json          # 165 hand-crafted Bangla question–SQL pairs
+│   ├── templates.json          # 228 hand-crafted Bangla question–SQL pairs
 │   ├── dataset_{train,dev,test}.json
 │   ├── dataset_stats.json
 │   └── train_config.json       # Written by preprocess_check.py
