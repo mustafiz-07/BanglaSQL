@@ -522,6 +522,32 @@ def compute_stats(templates, value_pairs, polarity_pairs, all_pairs, train, dev,
 
 # ── Main ──────────────────────────────────────────────────────────────────────
 
+def drop_answer_leakage(train, dev, test):
+    """Remove dev/test examples whose gold result set already appears in train.
+
+    Different SQL can return the same rows — "students with grade point above 3.5" and
+    "students with an A or A+" pick out the same enrolments, because the grading scale
+    makes them the same set. When one of a pair is in train and the other in test, the
+    model can answer the test question by reciting the training query and still score a
+    correct execution match. Textual SQL deduplication does not catch this; comparing
+    result sets does.
+    """
+    con = sqlite3.connect(f"file:{DB_PATH}?mode=ro", uri=True)
+    try:
+        answer = lambda pair: repr(con.execute(pair["sql_query"]).fetchall())
+        seen = {answer(p) for p in train}
+        kept, dropped = {}, 0
+        for name, split in (("dev", dev), ("test", test)):
+            kept[name] = [p for p in split if answer(p) not in seen]
+            dropped += len(split) - len(kept[name])
+            seen.update(answer(p) for p in kept[name])
+    finally:
+        con.close()
+    if dropped:
+        print(f"      Dropped {dropped} dev/test example(s) whose answer already appears in train")
+    return train, kept["dev"], kept["test"]
+
+
 def main():
     print("=" * 60)
     print("BanglaSQL Dataset Builder — Phase 2")
@@ -562,6 +588,8 @@ def main():
           f"({len(all_pairs) / len(templates):.1f}x base)")
 
     train, dev, test = split_dataset(all_pairs)
+    train, dev, test = drop_answer_leakage(train, dev, test)
+    all_pairs = train + dev + test
     total = len(all_pairs)
     print(f"\n[4/5] Split (by template, stratified by query_type):")
     print(f"      Train : {len(train):4d} ({len(train)/total:.0%})")

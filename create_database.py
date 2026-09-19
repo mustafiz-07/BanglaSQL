@@ -126,6 +126,9 @@ SEMESTERS = [
     "Spring 2025",
 ]
 
+# Summer terms are small, so course counts per semester range from 2 to ~20.
+SEMESTER_WEIGHTS = [5, 1, 5, 6, 1, 4, 3]
+
 GRADES = ["A+", "A", "A-", "B+", "B", "B-", "C+", "C", "D", "F"]
 GRADE_POINTS = {
     "A+": 4.00, "A": 3.75, "A-": 3.50,
@@ -134,6 +137,31 @@ GRADE_POINTS = {
 }
 
 ATTENDANCE_STATUS = ["Present", "Absent", "Late"]
+
+# Every department gets its own CGPA centre, so department averages actually differ.
+# Without this, uniform(2.0, 4.0) gives every department a mean near 3.0 and questions
+# like "which departments average above 3.5?" have no answer at all.
+DEPT_CGPA_MEAN = {
+    1: 3.70, 2: 3.64, 3: 3.05, 4: 2.88, 5: 3.28,
+    6: 3.10, 7: 3.66, 8: 3.36, 9: 3.15, 10: 2.98,
+}
+
+# Students do fail courses, and grades that only ever scatter around a student's CGPA
+# never reach F — which left "who got an F?" with no answer at all.
+FAILURE_RATE = 0.05
+
+# Fixed dates every course meets on, so date filters land on real sessions instead of
+# depending on a random draw. The first two are referenced by name in the templates.
+ANCHOR_DATES = ["2024-03-15", "2023-01-10"]
+SESSION_DATES = ANCHOR_DATES + [
+    "2023-02-14", "2023-04-11", "2023-09-05", "2023-11-21",
+    "2024-01-18", "2024-05-09", "2024-08-22", "2024-10-17",
+    "2025-02-06", "2025-04-24",
+]
+
+# A fifth of students attend poorly. A single flat absence rate leaves nobody with more
+# than one or two absences, which makes "who was absent more than 5 times?" unanswerable.
+FREQUENT_ABSENTEE_SHARE = 0.20
 
 
 # ── Schema creation ───────────────────────────────────────────────────────────
@@ -228,41 +256,69 @@ def populate(conn: sqlite3.Connection):
     conn.commit()
 
     # 2. Instructors (~50, spread across departments)
+    # Every department is given at least one Professor and one Lecturer, so questions
+    # like "who are the professors in Mathematics?" always have an answer.
     designations = ["Professor", "Associate Professor", "Assistant Professor", "Lecturer"]
-    instructor_ids_by_dept = {}  # dept_id → [instructor_ids]
+    pending = []
     for dept_id in range(1, 11):
-        instructor_ids_by_dept[dept_id] = []
-        count = random.randint(4, 6)
-        for _ in range(count):
+        count = random.randint(5, 7)
+        titles = ["Professor", "Lecturer"] + [random.choice(designations) for _ in range(count - 2)]
+        for designation in titles:
             fn = random.choice(BANGLA_FIRST_NAMES)
             ln = random.choice(BANGLA_LAST_NAMES)
-            email = f"{fn.lower()}.{ln.lower()}{random.randint(1,99)}@university.edu.bd"
-            designation = random.choice(designations)
-            joining = random.randint(2000, 2022)
-            cur.execute(
-                "INSERT INTO instructors (first_name, last_name, email, dept_id, designation, joining_year) "
-                "VALUES (?, ?, ?, ?, ?, ?)",
-                (fn, ln, email, dept_id, designation, joining),
-            )
-            instructor_ids_by_dept[dept_id].append(cur.lastrowid)
+            email = f"{fn.lower()}.{ln.lower()}{random.randint(1,999)}@university.edu.bd"
+            pending.append((fn, ln, email, dept_id, designation, random.randint(2000, 2022)))
+    # Shuffle before inserting. Inserting department by department made instructor_id 1..6
+    # the whole of department 1, so "any 5 instructors" and "the instructors in Computer
+    # Science" returned the same rows and either query answered both questions.
+    random.shuffle(pending)
+    instructor_ids_by_dept = {d: [] for d in range(1, 11)}
+    for row in pending:
+        cur.execute(
+            "INSERT INTO instructors (first_name, last_name, email, dept_id, designation, joining_year) "
+            "VALUES (?, ?, ?, ?, ?, ?)", row)
+        instructor_ids_by_dept[row[3]].append(cur.lastrowid)
     conn.commit()
 
-    # 3. Students (300 rows, spread across departments)
+    # 3. Students (~300 rows, spread across departments)
     student_ids = []
+    dept_of_student = {}
+    cgpa_of_student = {}
+    pending = []
     for dept_id in range(1, 11):
-        count = random.randint(25, 35)
-        for _ in range(count):
+        for _ in range(random.randint(25, 35)):
             fn = random.choice(BANGLA_FIRST_NAMES)
             ln = random.choice(BANGLA_LAST_NAMES)
-            email = f"{fn.lower()}.{ln.lower()}{random.randint(100,9999)}@student.university.edu.bd"
-            year_adm = random.randint(2019, 2024)
-            cgpa = round(random.uniform(2.0, 4.0), 2)
-            cur.execute(
-                "INSERT INTO students (first_name, last_name, email, dept_id, year_of_admission, cgpa) "
-                "VALUES (?, ?, ?, ?, ?, ?)",
-                (fn, ln, email, dept_id, year_adm, cgpa),
-            )
-            student_ids.append(cur.lastrowid)
+            email = f"{fn.lower()}.{ln.lower()}{random.randint(100,99999)}@student.university.edu.bd"
+            # Resample rather than clip: clipping piles a dozen students onto exactly
+            # 4.00 and makes "who has exactly 4.0?" a different question than intended.
+            cgpa = random.gauss(DEPT_CGPA_MEAN[dept_id], 0.35)
+            while not 2.0 <= cgpa <= 4.0:
+                cgpa = random.gauss(DEPT_CGPA_MEAN[dept_id], 0.35)
+            pending.append((fn, ln, email, dept_id, random.randint(2019, 2024), round(cgpa, 2)))
+    # Shuffled for the same reason as instructors: otherwise "the first 10 students" is
+    # exactly "the students of department 1".
+    random.shuffle(pending)
+    for row in pending:
+        cur.execute(
+            "INSERT INTO students (first_name, last_name, email, dept_id, year_of_admission, cgpa) "
+            "VALUES (?, ?, ?, ?, ?, ?)", row)
+        student_ids.append(cur.lastrowid)
+        dept_of_student[cur.lastrowid] = row[3]
+        cgpa_of_student[cur.lastrowid] = row[5]
+    # No student is pinned to exactly 4.00. A forced perfect score made the highest CGPA
+    # and the highest grade point both 4.0, so "what is the highest grade point?" (test)
+    # and "what is the highest CGPA?" (train) had the same answer and the test question
+    # could be answered by reciting the training one.
+    #
+    # The top CGPA is placed outside the strongest department for the same reason: if the
+    # best student overall were also a Computer Science student, "the highest CGPA in
+    # Computer Science" and "the highest CGPA" would be the same number and a query that
+    # dropped the department filter would score correct.
+    top = max((sid for sid in student_ids if dept_of_student[sid] == 7),
+              key=lambda sid: cgpa_of_student[sid])
+    cur.execute("UPDATE students SET cgpa = 3.99 WHERE student_id = ?", (top,))
+    cgpa_of_student[top] = 3.99
     conn.commit()
 
     # 4. Courses (~80, from department course lists)
@@ -275,7 +331,9 @@ def populate(conn: sqlite3.Connection):
             code = f"{prefix}{(j + 1) * 100 + random.randint(1, 9)}"
             credits = random.choice([3, 3, 3, 4])  # mostly 3-credit
             instructor_id = random.choice(instructor_ids_by_dept[dept_id])
-            semester = random.choice(SEMESTERS)
+            # Skewed on purpose: with courses spread evenly, every semester clears any
+            # threshold a question can ask about and the filter stops discriminating.
+            semester = random.choices(SEMESTERS, weights=SEMESTER_WEIGHTS, k=1)[0]
             cur.execute(
                 "INSERT INTO courses (course_code, course_name, credits, dept_id, instructor_id, semester) "
                 "VALUES (?, ?, ?, ?, ?, ?)",
@@ -286,51 +344,79 @@ def populate(conn: sqlite3.Connection):
             all_course_ids.append(cid)
     conn.commit()
 
-    # 5. Enrollments (~500 rows)
-    enrollment_pairs = set()
-    for _ in range(500):
-        sid = random.choice(student_ids)
-        # Get student's dept
-        cur.execute("SELECT dept_id FROM students WHERE student_id = ?", (sid,))
-        s_dept = cur.fetchone()[0]
-        # 70% chance to enroll in own department, 30% cross-department
-        if random.random() < 0.7 and course_ids_by_dept.get(s_dept):
-            cid = random.choice(course_ids_by_dept[s_dept])
+    # 5. Enrollments — every student takes 2–6 courses, mostly in their own department.
+    # Driving this from students rather than sampling at random guarantees that no student
+    # and no course ends up with an empty record, which is what made "student 2's
+    # attendance" and "courses with more than 5 students" return nothing.
+    enrollments_by_student = {}
+    enrolled_pairs = set()
+
+    def enrol(sid, cid):
+        if (sid, cid) in enrolled_pairs:
+            return
+        enrolled_pairs.add((sid, cid))
+        # A student's course grades scatter around their CGPA instead of being drawn at
+        # random. Random grades left a 3.9 student as likely to fail as a 2.1 student,
+        # and left nobody scoring A+ twice, so DISTINCT never removed a row.
+        if random.random() < FAILURE_RATE:
+            grade = "F"
         else:
-            cid = random.choice(all_course_ids)
-
-        if (sid, cid) in enrollment_pairs:
-            continue
-        enrollment_pairs.add((sid, cid))
-
-        grade = random.choice(GRADES)
-        gp = GRADE_POINTS[grade]
+            target = random.gauss(cgpa_of_student[sid], 0.45)
+            grade = min(GRADES, key=lambda g: abs(GRADE_POINTS[g] - target))
         cur.execute(
-            "INSERT INTO enrollments (student_id, course_id, grade, grade_point) "
-            "VALUES (?, ?, ?, ?)",
-            (sid, cid, grade, gp),
+            "INSERT INTO enrollments (student_id, course_id, grade, grade_point) VALUES (?, ?, ?, ?)",
+            (sid, cid, grade, GRADE_POINTS[grade]),
         )
+        enrollments_by_student.setdefault(sid, []).append(cid)
+
+    # Courses differ in popularity. With uniform choice every course lands within a few
+    # students of every other, so "courses with more than 5 students" selects all 80 and
+    # a prediction that drops the HAVING clause scores exactly as well as the gold.
+    popularity = {cid: random.random() ** 2.5 + 0.03 for cid in all_course_ids}
+    for sid in student_ids:
+        own = course_ids_by_dept[dept_of_student[sid]]
+        for _ in range(random.randint(2, 6)):
+            pool = own if random.random() < 0.75 else all_course_ids
+            cid = random.choices(pool, weights=[popularity[c] for c in pool], k=1)[0]
+            enrol(sid, cid)
+    # Top every course up to at least 3 enrolments so no course is empty. Deliberately
+    # not higher: "courses with more than 5 students" has to exclude something, or the
+    # HAVING clause is decoration and a query that omits it scores just as well.
+    for cid in all_course_ids:
+        taken = {s for (s, c) in enrolled_pairs if c == cid}
+        while len(taken) < 3:
+            sid = random.choice(student_ids)
+            if sid not in taken:
+                enrol(sid, cid)
+                taken.add(sid)
     conn.commit()
 
-    # 6. Attendance (~500 rows)
-    for _ in range(500):
-        sid = random.choice(student_ids)
-        cid = random.choice(all_course_ids)
-        # Random date in 2023–2025
-        month = random.randint(1, 12)
-        day = random.randint(1, 28)
-        year = random.choice([2023, 2024, 2025])
-        date_str = f"{year}-{month:02d}-{day:02d}"
-        status = random.choices(
-            ATTENDANCE_STATUS,
-            weights=[0.75, 0.15, 0.10],  # mostly present
-            k=1,
-        )[0]
-        cur.execute(
-            "INSERT INTO attendance (student_id, course_id, date, status) "
-            "VALUES (?, ?, ?, ?)",
-            (sid, cid, date_str, status),
-        )
+    # 6. Attendance — real sessions of courses the student is actually enrolled in.
+    # Previously a student could have attendance for a course they never took.
+    absentees = set(random.sample(student_ids, int(len(student_ids) * FREQUENT_ABSENTEE_SHARE)))
+    for sid, courses in enrollments_by_student.items():
+        # A frequent absentee misses roughly 45% of sessions; everyone else about 10%.
+        weights = [0.45, 0.40, 0.15] if sid in absentees else [0.82, 0.10, 0.08]
+        for cid in courses:
+            for date_str in random.sample(SESSION_DATES, random.randint(3, 5)):
+                status = random.choices(ATTENDANCE_STATUS, weights=weights, k=1)[0]
+                cur.execute(
+                    "INSERT INTO attendance (student_id, course_id, date, status) VALUES (?, ?, ?, ?)",
+                    (sid, cid, date_str, status),
+                )
+    # Guarantee the two dates the templates name by hand are populated on both sides.
+    for date_str in ANCHOR_DATES:
+        for sid in student_ids[:40]:
+            cid = enrollments_by_student[sid][0]
+            cur.execute(
+                "SELECT 1 FROM attendance WHERE student_id = ? AND course_id = ? AND date = ?",
+                (sid, cid, date_str),
+            )
+            if not cur.fetchone():
+                cur.execute(
+                    "INSERT INTO attendance (student_id, course_id, date, status) VALUES (?, ?, ?, 'Present')",
+                    (sid, cid, date_str),
+                )
     conn.commit()
 
 
