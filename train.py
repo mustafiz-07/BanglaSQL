@@ -37,9 +37,12 @@ import os
 import random
 import logging
 import inspect
+import warnings
 
+import huggingface_hub
 import numpy as np
 import torch
+import transformers
 from torch.utils.data import Dataset
 
 from transformers import (
@@ -64,8 +67,21 @@ torch.manual_seed(SEED)
 if torch.cuda.is_available():
     torch.cuda.manual_seed_all(SEED)
 
-logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(message)s")
+# No timestamp prefix: the training log is read as a sequence of epochs, not of clock
+# times, and the prefix pushed the numbers that matter off to the right.
+logging.basicConfig(level=logging.INFO, format="%(message)s")
 logger = logging.getLogger(__name__)
+
+# Keep the log to the two things worth reading: the periodic loss dict and the metrics
+# dict at the end of each epoch. Everything muted below is either a repainting progress
+# bar, an HTTP request the hub made, or a banner restating settings already printed.
+for noisy in ("httpx", "httpcore", "urllib3", "filelock", "huggingface_hub", "datasets"):
+    logging.getLogger(noisy).setLevel(logging.WARNING)
+transformers.utils.logging.set_verbosity_warning()
+transformers.utils.logging.disable_progress_bar()
+huggingface_hub.utils.disable_progress_bars()
+# Raised once per epoch on a CPU-only machine; irrelevant on the GPU the run uses.
+warnings.filterwarnings("ignore", message=".*pin_memory.*")
 
 # ── Paths ─────────────────────────────────────────────────────────────────────
 BASE_DIR    = os.path.dirname(os.path.abspath(__file__))
@@ -101,6 +117,10 @@ LABEL_SMOOTHING  = 0.0
 # far more here than a few extra epochs do.
 EARLY_STOPPING_PATIENCE      = 10
 MIN_EPOCHS_BEFORE_EARLY_STOP = 6
+
+# One loss line per this many optimizer steps. At ~190 steps an epoch that is about
+# nine lines per epoch — enough to see the curve without burying the epoch results.
+LOGGING_STEPS = 20
 
 EVAL_NUM_BEAMS = 1
 
@@ -251,8 +271,13 @@ def main():
         "generation_max_length": MAX_TARGET_LENGTH,
         "generation_num_beams": EVAL_NUM_BEAMS,
         "logging_dir": LOGS_DIR,
-        "logging_steps": 20,
+        "logging_steps": LOGGING_STEPS,
         "report_to": "none",
+        # Without this the Trainer installs its progress-bar callback, which repaints a
+        # per-step bar with an ETA. Disabling it swaps in the plain printer, which emits
+        # one dict per logging_steps and one per evaluation — the loss line and the
+        # epoch result, and nothing else.
+        "disable_tqdm": True,
         "seed": SEED,
         "data_seed": SEED,
         "fp16": False,
