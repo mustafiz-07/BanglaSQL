@@ -30,18 +30,30 @@ runtime`) so Step 2 clones the latest code rather than reusing an old checkout.
 228 hand-written Bangla question–SQL templates across two difficulty tiers, expanded
 in two ways:
 
-- **Value-slot variants (210)** — one literal swapped consistently in the question and
+- **Value-slot variants (207)** — one literal swapped consistently in the question and
   the SQL: department (গণিত ↔ `'Mathematics'`), CGPA / grade-point / year thresholds
   (৩.৫ ↔ `3.5`), grade, semester, course name, `LIMIT`. Each variant is a new SQL
   target, kept only if it executes and returns rows.
+- **Polarity variants (44)** — the comparison operator or sort direction flipped in
+  both places: বেশি ↔ কম with `>` ↔ `<`, অবরোহী ↔ আরোহী with `DESC` ↔ `ASC`, and
+  "top N" superlatives (সবচেয়ে বেশি ↔ সবচেয়ে কম, সর্বোচ্চ ↔ সর্বনিম্ন) with the
+  `ORDER BY` direction. Without these the operator stays welded to its template and
+  the model never has to read the Bangla word to get it right; they were run 3's two
+  largest error categories. Queries whose direction is carried by `MAX()`/`MIN()`
+  are excluded, since those rules do not rewrite the aggregate.
+
+  Coverage after this change: 12 of 16 templates that use a comparison now appear
+  with both `>` and `<`, and 21 of 33 that sort appear with both `ASC` and `DESC`.
+  Most of the remainder are not flippable — their question states no direction
+  ("নাম অনুযায়ী সাজাও"), or the opposite already exists as its own template.
 - **Paraphrases** — synonym substitution and register frames; these vary only the
   Bangla wording.
 
 | | train | dev | test |
 |---|---|---|---|
-| examples | 1382 | 318 | 297 |
-| templates | 160 | 34 | 34 |
-| distinct SQL queries | 301 | 72 | 65 |
+| examples | 1521 | 261 | 339 |
+| templates | 165 | 29 | 34 |
+| distinct SQL queries | 342 | 58 | 79 |
 
 Template counts per `query_type` are deliberately balanced: after run 2, query types
 with ≤2 training templates averaged **31.4%** execution accuracy against **54.3%**
@@ -50,11 +62,20 @@ for the rest, so 63 templates were added to the thin tail (`limit`, `order_by`,
 `aggregate_avg/max/min`, …). Every query type that appears in test now has at least
 3 training templates.
 
-**Split design — template-level holdout, stratified by `query_type`.** Every variant
-(value or paraphrase) stays with its base template, so nothing derived from a
-training template can reach dev or test (0 test SQL queries are seen in training).
-Templates are partitioned *within* each `query_type`, so train covers all 28 query
-shapes while dev/test consist entirely of unseen templates.
+**Split design — template-level holdout, stratified by `query_type`, stable across
+dataset edits.** Every variant (value, polarity or paraphrase) stays with its base
+template, so nothing derived from a training template can reach dev or test (0 test
+SQL queries are seen in training). Templates are partitioned *within* each
+`query_type`, so train covers all 28 query shapes while dev/test consist entirely of
+unseen templates.
+
+Assignment is by a template's **position** within its query_type, not by shuffling:
+ids are append-only and zero-padded, so a newly written template always sorts last
+and every existing template keeps its split. This matters for reading results —
+between runs 2 and 3 the old shuffle reassigned templates whenever the template file
+changed, which alone moved `join_where_order` from 100% to 0% because test had drawn
+a different single template. From run 4 on, per-query-type numbers are comparable
+across runs.
 
 Statistics, including leakage and coverage checks, are written to
 `data/dataset_stats.json` by `build_dataset.py`.
@@ -114,7 +135,8 @@ is aborted after 5 seconds.
 |---|---|---|---|---|
 | 1 | 642 train pairs (107 distinct SQL), schema in input, top-1 beam | 27.2% | 21.7% | 63.3% |
 | 2 | value-slot augmentation (224 distinct SQL), question-only input, exec-guided | 45.5% | 23.5% | 81.8% |
-| 3 | +63 templates for thin query types (301 distinct SQL), LR 2e-4 | *pending* | | |
+| 3 | +63 templates for thin query types (301 distinct SQL), LR 2e-4 | 41.8% | 34.0% | 80.8% |
+| 4 | polarity augmentation (342 distinct SQL), stable split | *pending* | | |
 
 Run 1 memorised its 107 SQL targets: train loss reached 0.01 while dev loss rose from
 epoch 3, and 49 of its 66 invalid queries were schema-grounding errors
@@ -129,8 +151,19 @@ remaining failures were concentrated in query types with almost no training supp
 model changes. Run 2 also showed an instability spike at epoch 10 (dev loss
 0.22 → 0.80) at LR 3e-4, hence the drop to 2e-4.
 
-Test-set sizes differ between runs because the split is regenerated from the
-templates, so compare at the query-type level rather than example counts.
+Run 3's headline number (41.8%) is **not** directly comparable to run 2's 45.5%: the
+test set was rebuilt with a different template assignment and is weighted toward the
+query types run 2 failed outright. The component scores are the fair read, and they
+improved substantially — SELECT 40.5% → 68.3%, JOIN 58.7% → 76.4%, aggregates
+68.0% → 80.5%, `wrong_table` failures 25 → 6 — as did exact match (23.5% → 34.0%).
+The added coverage worked where it was aimed: `limit` and `select_column` went
+0% → 100%, `multi_join_where` 13% → 63%, `join` 0% → 50%.
+
+Run 3's remaining errors were concentrated in two categories that augmentation had
+never varied: `wrong_filter` (53, 17.8% — `cgpa < 2.5` predicted as `cgpa > 2.5`)
+and `wrong_order_by` (39, 13.1%, of which 12 were pure ASC/DESC flips). Run 4 adds
+polarity variants for exactly those, and freezes the split so the next comparison is
+clean.
 
 ## Demo
 

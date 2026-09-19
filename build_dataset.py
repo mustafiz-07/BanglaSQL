@@ -4,20 +4,24 @@ BanglaSQL — Dataset Builder (Phase 2)
 Loads base templates, generates value-slot variants, augments via rule-based
 Bangla paraphrasing, deduplicates, and produces train/dev/test splits.
 
-Two kinds of augmentation, doing different jobs:
+Three kinds of augmentation, doing different jobs:
   - Value-slot variants swap one literal (department, CGPA/year threshold, grade,
     semester, course, LIMIT) consistently in the question and the SQL. They add
     new SQL *targets*. Without them the 107 training templates gave the model
     just 107 distinct SQL strings to recall; the first run memorised them (train
     loss 0.01, dev loss rising from epoch 3) and 49 of 66 invalid test queries
     were schema-grounding errors such as `students WHERE grade = ...`.
+  - Polarity variants flip a comparison operator or sort direction in both the
+    question and the SQL, so the model has to read বেশি/কম and আরোহী/অবরোহী
+    rather than inherit them from the template.
   - Paraphrases (synonyms + register frames) vary only the Bangla wording.
 
-Split strategy — template-level holdout, stratified by query_type:
-  Every variant (value or paraphrase) stays with its base template, so nothing
-  derived from a training template can reach dev/test. Templates are split
-  within each query_type, so train sees every SQL shape while dev/test consist
-  entirely of unseen templates.
+Split strategy — template-level holdout, stratified by query_type, stable:
+  Every variant stays with its base template, so nothing derived from a training
+  template can reach dev/test. Templates are split within each query_type by
+  position (not by shuffling), so train sees every SQL shape, dev/test consist
+  entirely of unseen templates, and adding templates never reassigns existing
+  ones — which is what makes results comparable between runs.
 
 Run (after create_database.py — value variants are checked against the DB):
     python build_dataset.py
@@ -50,9 +54,11 @@ TEMPLATES_PATH = os.path.join(DATA_DIR, "templates.json")
 MAX_PARAPHRASES_PER_TEMPLATE  = 5
 VALUE_VARIANTS_PER_TEMPLATE   = 3
 PARAPHRASES_PER_VALUE_VARIANT = 2
-TRAIN_RATIO = 0.70
-DEV_RATIO   = 0.15
-TEST_RATIO  = 0.15
+
+# Split slot by a template's position within its query_type; see split_dataset().
+# Works out to 5/7 train, 1/7 dev, 1/7 test, with the first two positions in train
+# so a query_type with one or two templates is never held out of training.
+SPLIT_CYCLE = ["train", "train", "test", "train", "dev", "train", "train"]
 
 # ── Synonym dictionary (standard Cholito Bangla) ──────────────────────────────
 # Every entry must be meaning-preserving and grammatical in place. Substitutions
@@ -89,6 +95,11 @@ SYNONYMS = {
     "অবরোহী ক্রমে": ["বড় থেকে ছোট ক্রমে", "উচ্চ থেকে নিম্ন ক্রমে"],
     "আরোহী ক্রমে":  ["ছোট থেকে বড় ক্রমে", "নিম্ন থেকে উচ্চ ক্রমে"],
     "অনুযায়ী সাজিয়ে": ["অনুসারে সাজিয়ে", "অনুযায়ী ক্রমে"],
+    # বর্ণানুক্রমে appears in only a handful of templates; tying it to the frequent
+    # phrasing stops it being learned as an isolated, rare token (run 3 answered it
+    # with ORDER BY designation instead of ORDER BY first_name).
+    "বর্ণানুক্রমে সাজিয়ে": ["নাম অনুযায়ী আরোহী ক্রমে", "অক্ষরের ক্রম অনুসারে"],
+    "বর্ণানুক্রমে": ["নাম অনুযায়ী আরোহী ক্রমে", "অক্ষরের ক্রম অনুসারে"],
 
     # admission / joining
     "ভর্তি হয়েছে":   ["ভর্তি হয়েছিল", "ভর্তি নিয়েছে"],
@@ -317,6 +328,90 @@ def value_variants(template: dict, known_sql: set, con: sqlite3.Connection) -> l
     return variants
 
 
+# ── Polarity augmentation ──────────────────────────────────────────────────────
+# Value-slot augmentation varies the literal but leaves the comparison operator and
+# the sort direction welded to their template, so the model never has to read
+# বেশি/কম or আরোহী/অবরোহী to get them right. Those two were run 3's largest failure
+# categories: wrong_filter (17.8%, e.g. `cgpa < 2.5` predicted as `cgpa > 2.5`) and
+# wrong_order_by (13.1%, of which 12 were pure ASC/DESC flips).
+# (sql_pattern, sql_replacement, bangla_old, bangla_new)
+POLARITY_RULES = [
+    (r"(?<= )>(?= )", "<", "বেশি", "কম"),
+    (r"(?<= )<(?= )", ">", "কম", "বেশি"),
+    (r"\bASC\b", "DESC", "আরোহী", "অবরোহী"),
+    (r"\bDESC\b", "ASC", "অবরোহী", "আরোহী"),
+]
+
+# A superlative ("সবচেয়ে বেশি") contains the comparison word, so it would make the
+# বেশি/কম rules fire on text that is not a comparison.
+COMPARISON_BLOCKERS = ["সবচেয়ে বেশি", "সবচেয়ে কম", "সর্বোচ্চ", "সর্বনিম্ন"]
+
+# A superlative phrased as "top N by X" maps onto ORDER BY ... LIMIT, and there it
+# does have a clean opposite. Only safe when the direction is not also carried by a
+# MAX()/MIN() aggregate, which these rules do not rewrite.
+SUPERLATIVE_DIRECTION_RULES = [
+    ("সবচেয়ে বেশি", "সবচেয়ে কম"),
+    ("সবচেয়ে কম", "সবচেয়ে বেশি"),
+    ("সর্বোচ্চ", "সর্বনিম্ন"),
+    ("সর্বনিম্ন", "সর্বোচ্চ"),
+    ("সবচেয়ে নতুন", "সবচেয়ে পুরনো"),
+    ("সবচেয়ে পুরনো", "সবচেয়ে নতুন"),
+]
+
+DIRECTION_FLIP = {"ASC": "DESC", "DESC": "ASC"}
+
+
+def polarity_variants(template: dict, known_sql: set, con: sqlite3.Connection) -> list[dict]:
+    """Flip a comparison operator or a sort direction in the question and the SQL together.
+
+    Applied only when the operator occurs exactly once in the SQL and its Bangla
+    marker exactly once in the question, so a swap can never silently change what
+    the question asks for.
+    """
+    question, sql = template["bangla_question"], template["sql_query"]
+    masked = re.sub(r"'[^']*'", lambda m: "'" + "_" * (len(m.group()) - 2) + "'", sql)
+    variants = []
+
+    def emit(new_question, new_sql):
+        if new_sql in known_sql or new_question == question:
+            return
+        try:
+            if not con.execute(new_sql).fetchall():
+                return
+        except sqlite3.Error:
+            return
+        known_sql.add(new_sql)
+        variant = deepcopy(template)
+        variant["template_id"] = f"{template['template_id']}_p{len(variants) + 1}"
+        variant["bangla_question"] = new_question
+        variant["sql_query"] = new_sql
+        variant["is_augmented"] = True
+        variant["is_polarity_variant"] = True
+        variants.append(variant)
+
+    for pattern, replacement, bn_old, bn_new in POLARITY_RULES:
+        if bn_old in ("বেশি", "কম") and any(b in question for b in COMPARISON_BLOCKERS):
+            continue
+        if len(re.findall(pattern, masked)) != 1 or question.count(bn_old) != 1:
+            continue
+        match = re.search(pattern, masked)
+        emit(question.replace(bn_old, bn_new, 1),
+             sql[:match.start()] + replacement + sql[match.end():])
+
+    # "top N by X" superlatives: flip the ORDER BY direction with the Bangla phrase.
+    directions = re.findall(r"\b(ASC|DESC)\b", masked)
+    if len(directions) == 1 and not re.search(r"\b(MAX|MIN)\s*\(", masked, re.IGNORECASE):
+        match = re.search(r"\b(ASC|DESC)\b", masked)
+        for bn_old, bn_new in SUPERLATIVE_DIRECTION_RULES:
+            if question.count(bn_old) != 1:
+                continue
+            emit(question.replace(bn_old, bn_new, 1),
+                 sql[:match.start()] + DIRECTION_FLIP[directions[0]] + sql[match.end():])
+            break
+
+    return variants
+
+
 def deduplicate(pairs: list[dict]) -> list[dict]:
     """Remove exact-duplicate Bangla questions, keeping first occurrence."""
     seen, unique = set(), []
@@ -331,14 +426,22 @@ def deduplicate(pairs: list[dict]) -> list[dict]:
 # ── Dataset split ──────────────────────────────────────────────────────────────
 
 def split_dataset(all_pairs: list[dict]):
-    """Split by base template, stratified by query_type.
+    """Split by base template, stratified by query_type, stable across dataset edits.
 
-    Within each query_type the *templates* are partitioned 70/15/15, then every
-    variant follows its base template into that split. Train therefore contains
-    every query_type, and dev/test templates are entirely unseen.
+    Within each query_type, templates are sorted by id and assigned to splits by
+    their position using a fixed repeating cycle. Every variant follows its base
+    template, so train contains every query_type and dev/test templates are unseen.
 
-    Query types with a single template go wholly to train — holding out the only
-    example of a shape would make it unlearnable.
+    Position-based assignment rather than a shuffle is what makes runs comparable.
+    Template ids are append-only and zero-padded (easy_071, medium_132), so a newly
+    written template always sorts last within its query_type and every existing
+    template keeps its index — and therefore its split. Shuffling, as this did
+    before, reassigned templates whenever the template file changed: between runs 2
+    and 3 that alone moved join_where_order from 100% to 0%, because test had drawn
+    a different single template, not because the model got worse.
+
+    The cycle puts the first two templates of a type in train, so a query_type with
+    only one or two templates is never held out and left unlearnable.
     """
     by_template = defaultdict(list)
     for pair in all_pairs:
@@ -348,30 +451,10 @@ def split_dataset(all_pairs: list[dict]):
     for tid, pairs in by_template.items():
         templates_by_type[pairs[0].get("query_type", "unknown")].append(tid)
 
-    train_t, dev_t, test_t = [], [], []
+    buckets = {"train": [], "dev": [], "test": []}
     for qtype in sorted(templates_by_type):
-        tids = sorted(templates_by_type[qtype])
-        random.shuffle(tids)
-        n = len(tids)
-
-        if n == 1:
-            train_t += tids
-        elif n == 2:
-            train_t.append(tids[0])
-            test_t.append(tids[1])
-        else:
-            n_test = max(1, round(n * TEST_RATIO))
-            n_dev  = max(1, round(n * DEV_RATIO))
-            while n_test + n_dev >= n:           # always leave train >= 1
-                if n_dev > 1:
-                    n_dev -= 1
-                elif n_test > 1:
-                    n_test -= 1
-                else:
-                    break
-            test_t  += tids[:n_test]
-            dev_t   += tids[n_test:n_test + n_dev]
-            train_t += tids[n_test + n_dev:]
+        for i, tid in enumerate(sorted(templates_by_type[qtype])):
+            buckets[SPLIT_CYCLE[i % len(SPLIT_CYCLE)]].append(tid)
 
     def collect(tids):
         out = []
@@ -380,12 +463,12 @@ def split_dataset(all_pairs: list[dict]):
         random.shuffle(out)
         return out
 
-    return collect(train_t), collect(dev_t), collect(test_t)
+    return collect(buckets["train"]), collect(buckets["dev"]), collect(buckets["test"])
 
 
 # ── Stats ──────────────────────────────────────────────────────────────────────
 
-def compute_stats(templates, value_pairs, all_pairs, train, dev, test):
+def compute_stats(templates, value_pairs, polarity_pairs, all_pairs, train, dev, test):
     def tier(pairs, level):
         return sum(1 for p in pairs if p["difficulty"] == level)
 
@@ -400,6 +483,7 @@ def compute_stats(templates, value_pairs, all_pairs, train, dev, test):
             "total":  len(templates),
         },
         "value_slot_variants": len(value_pairs),
+        "polarity_variants": len(polarity_pairs),
         "after_augmentation_dedup": {
             "easy":   tier(all_pairs, "easy"),
             "medium": tier(all_pairs, "medium"),
@@ -458,16 +542,19 @@ def main():
 
     con = sqlite3.connect(f"file:{DB_PATH}?mode=ro", uri=True)
     known_sql = {t["sql_query"] for t in templates}
-    value_pairs = []
+    value_pairs, polarity_pairs = [], []
     for template in templates:
         value_pairs.extend(value_variants(template, known_sql, con))
+        polarity_pairs.extend(polarity_variants(template, known_sql, con))
     con.close()
-    print(f"\n[2/5] Value-slot variants: {len(value_pairs)} new question–SQL pairs")
+    generated = value_pairs + polarity_pairs
+    print(f"\n[2/5] Generated variants: {len(value_pairs)} value-slot, "
+          f"{len(polarity_pairs)} polarity (operator / sort direction)")
 
-    all_pairs = list(templates) + value_pairs
+    all_pairs = list(templates) + generated
     for template in templates:
         all_pairs.extend(augment_template(template, MAX_PARAPHRASES_PER_TEMPLATE))
-    for variant in value_pairs:
+    for variant in generated:
         all_pairs.extend(augment_template(variant, PARAPHRASES_PER_VALUE_VARIANT))
 
     all_pairs = deduplicate(all_pairs)
@@ -481,7 +568,7 @@ def main():
     print(f"      Dev   : {len(dev):4d} ({len(dev)/total:.0%})")
     print(f"      Test  : {len(test):4d} ({len(test)/total:.0%})")
 
-    stats = compute_stats(templates, value_pairs, all_pairs, train, dev, test)
+    stats = compute_stats(templates, value_pairs, polarity_pairs, all_pairs, train, dev, test)
     unseen_dev  = stats["query_types"]["dev_unseen_in_train"]
     unseen_test = stats["query_types"]["test_unseen_in_train"]
     if unseen_dev or unseen_test:
