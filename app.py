@@ -18,7 +18,9 @@ import streamlit as st
 import torch
 from transformers import AutoTokenizer, AutoModelForSeq2SeqLM
 
-from common import format_input, load_config, open_readonly_db, run_sql
+from common import (
+    format_input, has_duplicate_select_columns, load_config, open_readonly_db, run_sql,
+)
 
 MODEL_DIR = "checkpoints/best_model"
 NUM_BEAMS = 4
@@ -85,12 +87,18 @@ def generate_candidates(tokenizer, model, question: str, config: dict) -> list[s
 
 
 def choose_sql(candidates: list[str], tables: dict) -> tuple[str, int]:
-    """Execution-guided choice: first beam that passes validation and executes."""
+    """Execution-guided choice: first beam that validates, executes and has no repeated column."""
     con = open_readonly_db()
     try:
-        for rank, sql in enumerate(candidates):
-            if validate_sql(sql, tables) is None and run_sql(con, sql)[1] is None:
+        usable = [
+            (rank, sql) for rank, sql in enumerate(candidates)
+            if validate_sql(sql, tables) is None and run_sql(con, sql)[1] is None
+        ]
+        for rank, sql in usable:
+            if not has_duplicate_select_columns(sql):
                 return sql, rank
+        if usable:
+            return usable[0][1], usable[0][0]
     finally:
         con.close()
     return candidates[0], 0

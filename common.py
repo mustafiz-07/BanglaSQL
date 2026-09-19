@@ -131,13 +131,31 @@ def results_match(gold_rows, pred_rows, gold_sql: str) -> bool:
     return Counter(map(repr, gold_rows)) == Counter(map(repr, pred_rows))
 
 
+def has_duplicate_select_columns(sql: str) -> bool:
+    """True if the SELECT list names the same expression twice.
+
+    `SELECT course_name, course_name FROM courses` executes happily but returns an
+    extra column, so execution alone cannot filter it out. No gold query in this
+    dataset selects a column twice (checked: 0 of 228), so a repeat is always a
+    decoding artifact.
+    """
+    match = re.search(r"select\s+(?:distinct\s+)?(.*?)\s+from\s", normalize_sql(sql), re.S)
+    if not match:
+        return False
+    columns = [c.strip() for c in re.split(r",(?![^()]*\))", match.group(1))]
+    return len(columns) != len(set(columns))
+
+
 def pick_executable(candidates: list[str], con: sqlite3.Connection) -> str:
     """Execution-guided decoding (Wang et al., 2018): first beam that runs without error.
 
     Beams arrive in model-score order, so the model's ranking is kept among valid
-    queries and only overridden when a higher-scoring query cannot execute.
+    queries and only overridden when a higher-scoring query cannot execute or is a
+    recognisable artifact. Preference order: executes and has no repeated SELECT
+    column, then merely executes, then the top beam.
     """
-    for sql in candidates:
-        if run_sql(con, sql)[1] is None:
+    executable = [sql for sql in candidates if run_sql(con, sql)[1] is None]
+    for sql in executable:
+        if not has_duplicate_select_columns(sql):
             return sql
-    return candidates[0]
+    return executable[0] if executable else candidates[0]

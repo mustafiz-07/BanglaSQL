@@ -256,7 +256,7 @@
       "courses"
     ],
     "query_type": "order_by",
-    "bangla_question": "কোর্সগুলো ক্রেডিট অনুযায়ী অবরোহী ক্রমে সাজিয়ে দেখাও।",
+    "bangla_question": "কোর্সগুলোর কোড ও নাম ক্রেডিট অনুযায়ী অবরোহী ক্রমে সাজিয়ে দেখাও।",
     "sql_query": "SELECT course_code, course_name, credits FROM courses ORDER BY credits DESC;"
   },
   {
@@ -951,7 +951,7 @@
       "courses"
     ],
     "query_type": "multi_join",
-    "bangla_question": "প্রতিটি শিক্ষার্থী কোন কোন কোর্সে নথিভুক্ত আছে তার নাম সহ দেখাও।",
+    "bangla_question": "প্রতিটি শিক্ষার্থী কোন কোন কোর্সে নথিভুক্ত আছে তা নাম ও গ্রেড সহ দেখাও।",
     "sql_query": "SELECT s.first_name, s.last_name, c.course_name, e.grade FROM students s JOIN enrollments e ON s.student_id = e.student_id JOIN courses c ON e.course_id = c.course_id;"
   },
   {
@@ -1523,7 +1523,7 @@
       "courses"
     ],
     "query_type": "multi_join_where",
-    "bangla_question": "কোন শিক্ষার্থীরা কোন কোর্সে অনুপস্থিত ছিল তা দেখাও।",
+    "bangla_question": "কোন শিক্ষার্থীরা কোন কোর্সে কোন তারিখে অনুপস্থিত ছিল তা দেখাও।",
     "sql_query": "SELECT s.first_name, s.last_name, c.course_name, a.date FROM students s JOIN attendance a ON s.student_id = a.student_id JOIN courses c ON a.course_id = c.course_id WHERE a.status = 'Absent';"
   },
   {
@@ -1841,7 +1841,7 @@
       "courses"
     ],
     "query_type": "order_by",
-    "bangla_question": "কোর্সগুলো নাম অনুযায়ী বর্ণানুক্রমে সাজাও।",
+    "bangla_question": "কোর্সগুলোর কোড ও নাম বর্ণানুক্রমে সাজাও।",
     "sql_query": "SELECT course_code, course_name FROM courses ORDER BY course_name ASC;"
   },
   {
@@ -2322,7 +2322,7 @@
       "departments"
     ],
     "query_type": "join_where_order",
-    "bangla_question": "ইংরেজি বিভাগের কোর্সগুলো নাম অনুযায়ী সাজিয়ে দাও।",
+    "bangla_question": "ইংরেজি বিভাগের কোর্সগুলোর নাম ও ক্রেডিট নাম অনুযায়ী সাজিয়ে দাও।",
     "sql_query": "SELECT c.course_name, c.credits FROM courses c JOIN departments d ON c.dept_id = d.dept_id WHERE d.dept_name = 'English' ORDER BY c.course_name ASC;"
   },
   {
