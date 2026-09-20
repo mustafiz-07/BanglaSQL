@@ -17,6 +17,8 @@ Run:
 Outputs:
     logs/<split>_results.json      metrics (headline = execution-guided)
     logs/<split>_predictions.json  per-example predictions for error analysis
+    --tag NAME inserts NAME into both filenames, so the constrained and unconstrained
+    decoders can be run back to back without overwriting each other.
 """
 
 import argparse
@@ -90,8 +92,15 @@ def categorize_failure(gold_sql: str, pred_sql: str, exec_error: str | None) -> 
 
 # ── Generation ─────────────────────────────────────────────────────────────────
 
-def generate_candidates(model, tokenizer, questions, config, num_beams, batch_size=16):
-    """Return, per question, all `num_beams` beam outputs in model-score order."""
+def generate_candidates(model, tokenizer, questions, config, num_beams, batch_size=16,
+                        decoder=None):
+    """Return, per question, all `num_beams` beam outputs in model-score order.
+
+    With `decoder` set, generation is restricted to schema-valid continuations at every
+    step (see constrained_decode). That is a different mechanism from the execution-guided
+    reranking in pick_executable: reranking chooses among finished beams and is helpless
+    when all of them are invalid, which is what the 52 malformed predictions in run 7 were.
+    """
     device = "cuda" if torch.cuda.is_available() else "cpu"
     model.to(device).eval()
 
@@ -102,6 +111,8 @@ def generate_candidates(model, tokenizer, questions, config, num_beams, batch_si
     }
     if num_beams > 1:
         gen_kwargs["early_stopping"] = True
+    if decoder is not None:
+        gen_kwargs["prefix_allowed_tokens_fn"] = decoder.prefix_fn()
 
     candidates = []
     for start in range(0, len(questions), batch_size):
@@ -220,6 +231,11 @@ def main():
     parser.add_argument("--model", default=os.path.join(BASE_DIR, "checkpoints", "best_model"))
     parser.add_argument("--num-beams", type=int, default=4)
     parser.add_argument("--limit", type=int, default=None, help="evaluate only the first N examples")
+    parser.add_argument("--constrained", action="store_true",
+                        help="restrict generation to schema-valid continuations")
+    parser.add_argument("--tag", default="",
+                        help="suffix for the output filenames, so two decoders can be "
+                             "compared without overwriting each other")
     args = parser.parse_args()
 
     if not os.path.isdir(args.model):
@@ -267,14 +283,16 @@ def main():
         "checkpoint": args.model,
         "num_examples": total,
         "num_beams": args.num_beams,
-        "decoding": "execution_guided",
+        "decoding": "execution_guided" + ("+schema_constrained" if args.constrained else ""),
+        "constrained": bool(args.constrained),
         **guided,
         "top1_metrics": top1["metrics"],
     }
 
     os.makedirs(LOGS_DIR, exist_ok=True)
-    results_path = os.path.join(LOGS_DIR, f"{args.split}_results.json")
-    preds_path   = os.path.join(LOGS_DIR, f"{args.split}_predictions.json")
+    tag = f"_{args.tag}" if args.tag else ""
+    results_path = os.path.join(LOGS_DIR, f"{args.split}{tag}_results.json")
+    preds_path   = os.path.join(LOGS_DIR, f"{args.split}{tag}_predictions.json")
     with open(results_path, "w", encoding="utf-8") as f:
         json.dump(results, f, ensure_ascii=False, indent=2)
     with open(preds_path, "w", encoding="utf-8") as f:
