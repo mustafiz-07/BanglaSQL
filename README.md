@@ -136,7 +136,37 @@ is aborted after 5 seconds.
 | 1 | 642 train pairs (107 distinct SQL), schema in input, top-1 beam | 27.2% | 21.7% | 63.3% |
 | 2 | value-slot augmentation (224 distinct SQL), question-only input, exec-guided | 45.5% | 23.5% | 81.8% |
 | 3 | +63 templates for thin query types (301 distinct SQL), LR 2e-4 | 41.8% | 34.0% | 80.8% |
-| 4 | polarity augmentation (342 distinct SQL), stable split | *pending* | | |
+| 4 | polarity augmentation (342 distinct SQL), stable split | 38.0% | 21.8% | 83.2% |
+| 5 | duplicate-column rejection, gold-query audit (+ trained 10 epochs longer) | **58.7%** | 34.8% | 91.7% |
+| 6 | patience 5→10, orphan ASC/DESC rejection, run-on phrasing repair | 54.6% | 34.8% | 90.9% |
+| 7 | dataset audited and rebuilt: 13 gold errors fixed, database repopulated, loopholes closed | 55.0% | **50.4%** | 85.2% |
+| 8 | আগে/পরে polarity rule, aggregate aliases removed, target length 128→160 | *pending* | | |
+
+Run 7's component results confirmed the audit: `select` accuracy 44.5% → **75.8%** after
+every returned column was named in the question, `having` 40% → **100%** after aliases
+were standardised, and exact match 34.8% → **50.4%**, the largest jump in the project.
+Execution accuracy stayed flat at 55.0%, within a 95% CI of 0.371–0.727.
+
+**Run 7 breaks comparability on purpose.** An audit of all 228 templates found 13
+question/SQL disagreements, 4 questions whose correct answer was an empty table, clauses
+that excluded nothing, and answers shared across splits. Gold SQL and the database both
+changed, so run 7's numbers stand on their own. See [progress.md](progress.md) for the
+full audit and [data/templates_review.json](data/templates_review.json) for the
+per-template report.
+
+Runs 4, 5 and 6 share an identical test set. Run 6's targeted fixes each landed —
+`order_by` component accuracy 21.3% → 57.3%, `wrong_order_by` failures 15 → 0,
+training no longer early-stops — yet the headline fell 4.1 points. The test set holds
+339 examples but only **34 distinct templates**, and a cluster bootstrap over templates
+gives run 5 a 95% CI of 0.40–0.76 and run 6 one of 0.37–0.71: differences below about
+10 points are not measurable on this test set. Read the component table, not the
+headline. See [progress.md](progress.md).
+
+Headline numbers are only comparable from run 4 onward — each earlier run rebuilt the
+test set (runs 3 and 4 share just 4 of 34 test templates). Run 4's polarity
+augmentation cut `wrong_order_by` failures from 39 to 3 and lifted the `order_by`
+component from 23.5% to 41.8%, `where` from 54.3% to 65.1% and validity to 83.2%. See
+[progress.md](progress.md) for the full run-by-run analysis.
 
 Run 1 memorised its 107 SQL targets: train loss reached 0.01 while dev loss rose from
 epoch 3, and 49 of its 66 invalid queries were schema-grounding errors
@@ -191,6 +221,7 @@ docker compose run --rm banglasql bash
 ```
 nlp/
 ├── BanglaSQL_Project_Plan.md   # Full project plan
+├── progress.md                 # Run-by-run log: setup, results, failures, fixes
 ├── colab_train.ipynb           # Colab notebook — train + evaluate + curves
 ├── common.py                   # Shared input formatting, config, SQL execution helpers
 ├── create_database.py          # Schema + synthetic data generator
