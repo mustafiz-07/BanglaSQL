@@ -335,9 +335,18 @@ def value_variants(template: dict, known_sql: set, con: sqlite3.Connection) -> l
 # categories: wrong_filter (17.8%, e.g. `cgpa < 2.5` predicted as `cgpa > 2.5`) and
 # wrong_order_by (13.1%, of which 12 were pure ASC/DESC flips).
 # (sql_pattern, sql_replacement, bangla_old, bangla_new)
+#
+# আগে/পরে was missing until run 8, and the gap was total rather than partial: every
+# "আগে" (before, `<`) example lived in train through easy_013 and every "পরে" (after,
+# `>`) example in test through easy_015, so the model had never once seen পরে mean `>`.
+# It scored 0/15 on easy_015 in run 7, predicting `joining_year < 2015` for "২০১৫ সালের
+# পরে". A sweep over every comparison marker in the corpus found this was the only one
+# with a polarity that appears in no training example.
 POLARITY_RULES = [
     (r"(?<= )>(?= )", "<", "বেশি", "কম"),
     (r"(?<= )<(?= )", ">", "কম", "বেশি"),
+    (r"(?<= )<(?= )", ">", "আগে", "পরে"),
+    (r"(?<= )>(?= )", "<", "পরে", "আগে"),
     (r"\bASC\b", "DESC", "আরোহী", "অবরোহী"),
     (r"\bDESC\b", "ASC", "অবরোহী", "আরোহী"),
 ]

@@ -131,18 +131,21 @@ def profile_sequence_lengths(tokenizer, pairs: list[dict]):
         print(f"\n  {label}:")
         print(f"    min={min(lengths)}, max={max(lengths)}, mean={sum(lengths)//n}")
         print(f"    p50={p50}, p90={p90}, p95={p95}, p99={p99}")
-        return p95
+        return max(lengths)
 
     print("\n  Sequence Length Profile (over train + dev pairs):")
-    in_p95  = stats(input_lengths,  "Model input" + (" (question + schema)" if INCLUDE_SCHEMA else " (question only)"))
-    out_p95 = stats(output_lengths, "Output (SQL query)")
+    in_max  = stats(input_lengths,  "Model input" + (" (question + schema)" if INCLUDE_SCHEMA else " (question only)"))
+    out_max = stats(output_lengths, "Output (SQL query)")
 
-    recommended_in  = min(512, max(128, ((in_p95  // 64) + 1) * 64))
-    recommended_out = min(256, max(64,  ((out_p95 // 32) + 1) * 32))
+    # Sized off the longest sequence, not p95. p95 was 117 tokens while the longest gold
+    # query was 139, so run 7 trained with 36 targets silently cut short — the model was
+    # being shown incomplete SQL and asked to treat it as correct.
+    recommended_in  = min(512, max(128, ((in_max  // 64) + 1) * 64))
+    recommended_out = min(256, max(64,  ((out_max // 32) + 1) * 32))
 
     print(f"\n  Recommended max_input_length  : {recommended_in}")
     print(f"  Recommended max_target_length : {recommended_out}")
-    print("  (rounded up to nearest power-of-2 boundary, capped at 512/256)")
+    print("  (rounded up past the longest sequence, capped at 512/256)")
 
     return recommended_in, recommended_out
 
