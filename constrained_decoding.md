@@ -137,6 +137,70 @@ case-sensitive matching resolves it.
 Both were invisible in the error analysis and would have shown up only as a mysterious
 accuracy drop. They are the reason the force-decode gate is phase 3's exit criterion.
 
+## Result (run 8 checkpoint, 327 test examples)
+
+The local baseline reproduced the Colab run to four decimal places — 0.5963 / 0.5107 /
+0.9602 with identical failure categories — so the database, splits and checkpoint all
+match and any delta is attributable to the decoder alone.
+
+| metric | baseline | constrained | fallback |
+|---|---|---|---|
+| validity rate | 96.0% | **98.2%** | **98.2%** |
+| execution accuracy | 59.6% | **56.9%** | 59.6% |
+| exact match | 51.1% | 50.5% | 51.1% |
+| malformed SQL | 13 | **6** | **6** |
+| wall time | 720s | 1552s | ~810s |
+
+**Constraining every question raised validity and cost 2.8 points of accuracy.** Ten
+examples went from correct to wrong; one went the other way. All ten regressions are
+valid-but-wrong queries.
+
+### Why: the constraint and the reranker are partially antagonistic
+
+Traced on "সর্বোচ্চ গ্রেড পয়েন্ট কত?" (what is the highest grade point?):
+
+```
+unconstrained beams                       constrained beams
+1  MAX(e.grade_point), 2) ...      x      1  ROUND(AVG(e.grade_point), 2) FROM enrollments e   <- valid, WRONG
+2  ROUND(AVG(...)) FROM students   x      2  MAX(e.grade_point), 2) ...      x
+3  MAX(grade_point), 2) ...        x      3  MAX(grade_point), 2) ...        x
+4  MAX(e.grade_point) FROM enrollments e  4  MAX(e.grade_point) FROM enrollments e
+```
+
+The correct query is beam 4 in **both** runs. Unconstrained, beams 1-3 were all malformed,
+so `pick_executable` fell through to beam 4 and was right. Constrained, beam 2's unbound
+`e` became `FROM enrollments e` — valid — so reranking stops there and returns AVG where
+the question asked for MAX.
+
+Execution-guided reranking had been using invalidity as a free correctness signal. The
+constraint destroys that signal by making wrong queries valid. Reranking fired on 27
+baseline examples and only 15 constrained ones.
+
+### The fix, and its honest limit
+
+Constrain only where reranking has nothing to fall through to: generate unconstrained,
+then re-generate with the constraint just for questions where no beam executes (13 of 327
+here). That keeps the signal and still removes the malformed queries — **validity +2.1 at
+zero accuracy cost**.
+
+But the accuracy delta is exactly **0.0**. Of the 13 re-generated questions, 7 became
+valid and **none became correct**:
+
+```
+Q      প্রতিটি শিক্ষার্থীর নাম, কোর্সের কোড ও গ্রেড দাও।
+base   ... c.course_name, e.grade FROM students s JOIN courses c ...   -> no such column: e.grade
+fixed  ... c.course_name, e.grade FROM students s JOIN enrollments e ...  valid
+gold   ... c.course_code, e.grade FROM students s JOIN enrollments e ...
+```
+
+The constraint repaired the scope error and left the semantic one — `course_name` where
+gold wanted `course_code`. On this checkpoint the model's scope errors co-occur with
+semantic errors, so fixing scope yields a valid query that is still the wrong answer.
+
+**Claim to make: constrained decoding guarantees schema validity. It does not, here,
+improve correctness.** That is a real and measurable result, and the antagonism with
+execution-guided reranking is the more interesting half of it.
+
 ## Running the ablation
 
 Same checkpoint, two decoders — no retraining:

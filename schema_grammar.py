@@ -29,6 +29,11 @@ FREE   = "free"     # no identifier constraint applies
 
 IDENT_CHARS = re.compile(r"[A-Za-z0-9_]+")
 
+#: Cache miss marker. `None` is a legitimate cached value here — it means "no token can
+#: satisfy this constraint, fail open" — so `dict.get(key)` alone cannot tell a miss from
+#: a stored None, and every fail-open lookup would be recomputed, vocabulary scan included.
+_MISSING = object()
+
 # Keyword matching is case-sensitive on purpose. Every gold query writes keywords in
 # upper case and identifiers in lower case, and `joining_year` is the only identifier that
 # begins with a keyword — a case-insensitive rule read "WHERE join|" as the JOIN keyword
@@ -202,16 +207,22 @@ class TokenFilter:
         self.all_but_eos = [i for i in self.all_ids if i != self.eos_id]
         self._cache = {}
 
-    def allowed(self, names: tuple, partial: str, needs_space: bool = False) -> list[int] | None:
+    def allowed(self, names: tuple, partial: str, needs_space: bool = False,
+                allow_eos: bool = True) -> list[int] | None:
         """Token ids that carry `partial` further toward one of `names`.
+
+        `allow_eos=False` withholds end-of-sequence even where the identifier is complete.
+        The caller needs that because a finished identifier admits terminators, and
+        end-of-sequence is one of them — so `SELECT c.course_name FROM courses` could stop
+        there with `c` still unbound, which is the very thing EOS gating exists to prevent.
 
         Returns None when nothing can satisfy the constraint, which the caller treats as
         "fall back to unconstrained" — a grammar bug must degrade to current behaviour,
         never stall generation.
         """
-        key = (names, partial, needs_space)
-        cached = self._cache.get(key)
-        if cached is not None:
+        key = (names, partial, needs_space, allow_eos)
+        cached = self._cache.get(key, _MISSING)
+        if cached is not _MISSING:
             return cached
 
         # What still has to be spelled, including the pending word boundary.
@@ -226,7 +237,8 @@ class TokenFilter:
         # A finished identifier may be followed by punctuation or a space, so generation is
         # not trapped inside a name it has already spelled out.
         if partial in names and not needs_space:
-            allowed.extend(self.terminators)
+            allowed.extend(self.terminators if allow_eos
+                           else (t for t in self.terminators if t != self.eos_id))
 
         result = sorted(set(allowed)) or None
         self._cache[key] = result

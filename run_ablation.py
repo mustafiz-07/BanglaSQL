@@ -28,8 +28,9 @@ BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 LOGS_DIR = os.path.join(BASE_DIR, "logs")
 
 ARMS = [
-    ("baseline",    "execution-guided reranking", []),
-    ("constrained", "+ schema-constrained generation", ["--constrained"]),
+    ("baseline",    "execution-guided reranking only",            []),
+    ("constrained", "+ schema-constrained generation everywhere", ["--constrained"]),
+    ("fallback",    "+ constraint only where no beam executes",   ["--constrained-fallback"]),
 ]
 
 
@@ -65,56 +66,69 @@ def delta(new, old) -> str:
 
 
 def build_table(results: dict, split: str) -> str:
-    base, con = results["baseline"], results["constrained"]
+    tags = [tag for tag, _, _ in ARMS if tag in results]
+    base = results["baseline"]
+    head = " | ".join(tags)
+    rule = "|---" * (len(tags) + 1) + "|"
     lines = []
 
     lines.append(f"# Schema-constrained decoding — ablation on the {split} split\n")
     lines.append(f"Checkpoint: `{base['checkpoint']}`  ·  {base['num_examples']} examples  "
                  f"·  {base['num_beams']} beams\n")
-    lines.append("Same weights, same data, same seed. The only difference is whether "
-                 "generation is permitted to leave the schema.\n")
+    lines.append("Same weights, same data, same seed. The arms differ only in how "
+                 "generation is constrained.\n")
+    for tag, desc, _ in ARMS:
+        if tag in results:
+            lines.append(f"- **{tag}** — {desc}")
+    lines.append("")
 
-    lines.append("| metric | baseline | constrained | Δ |")
-    lines.append("|---|---|---|---|")
+    def row(label, values, bold=False):
+        name = f"**{label}**" if bold else label
+        lines.append("| " + " | ".join([name] + values) + " |")
+
+    lines.append(f"| metric | {head} |")
+    lines.append(rule)
     for label, key in [("validity rate", "validity_rate"),
                        ("execution accuracy", "execution_accuracy"),
                        ("exact match", "exact_match")]:
-        b, c = base["metrics"].get(key), con["metrics"].get(key)
-        lines.append(f"| **{label}** | {pct(b)} | {pct(c)} | {delta(c, b)} |")
-    for label, key in [("execution accuracy (top-1 beam)", "execution_accuracy"),
-                       ("validity rate (top-1 beam)", "validity_rate")]:
-        b = base.get("top1_metrics", {}).get(key)
-        c = con.get("top1_metrics", {}).get(key)
-        lines.append(f"| {label} | {pct(b)} | {pct(c)} | {delta(c, b)} |")
-    lines.append(f"| wall time | {base['wall_seconds']}s | {con['wall_seconds']}s | |")
+        row(label, [pct(results[t]["metrics"].get(key)) for t in tags], bold=True)
+    for label, key in [("validity rate (top-1 beam)", "validity_rate"),
+                       ("execution accuracy (top-1 beam)", "execution_accuracy")]:
+        row(label, [pct(results[t].get("top1_metrics", {}).get(key)) for t in tags])
+    row("wall time", [f"{results[t]['wall_seconds']}s" for t in tags])
 
     lines.append("\n## Failure categories\n")
-    cats = sorted(set(base["failure_categories"]) | set(con["failure_categories"]))
-    lines.append("| category | baseline | constrained | Δ |")
-    lines.append("|---|---|---|---|")
+    lines.append(f"| category | {head} |")
+    lines.append(rule)
+    cats = set().union(*(results[t]["failure_categories"] for t in tags))
     for cat in sorted(cats, key=lambda c: -base["failure_categories"].get(c, 0)):
-        b = base["failure_categories"].get(cat, 0)
-        c = con["failure_categories"].get(cat, 0)
-        lines.append(f"| `{cat}` | {b} | {c} | {c - b:+d} |")
+        row(f"`{cat}`", [str(results[t]["failure_categories"].get(cat, 0)) for t in tags])
 
     lines.append("\n## Component accuracy\n")
-    lines.append("| component | baseline | constrained | Δ |")
-    lines.append("|---|---|---|---|")
+    lines.append(f"| component | {head} |")
+    lines.append(rule)
     for name in sorted(base["component_accuracy"]):
-        b = base["component_accuracy"][name]["accuracy"]
-        c = con["component_accuracy"].get(name, {}).get("accuracy")
-        lines.append(f"| `{name}` | {pct(b)} | {pct(c)} | {delta(c, b)} |")
+        row(f"`{name}`",
+            [pct(results[t]["component_accuracy"].get(name, {}).get("accuracy")) for t in tags])
 
-    # The claim constrained decoding actually guarantees is validity; correctness is a
-    # separate matter, so say which one moved.
-    mal_b = base["failure_categories"].get("malformed_sql", 0)
-    mal_c = con["failure_categories"].get("malformed_sql", 0)
-    lines.append(f"\n## Reading\n")
-    lines.append(f"- Malformed SQL: **{mal_b} → {mal_c}** "
-                 f"({mal_b - mal_c} queries no longer fail to execute).")
-    lines.append(f"- Validity is the effect constrained decoding guarantees. Execution "
-                 f"accuracy moves only where the next-best schema-valid continuation "
-                 f"happens to be the correct one, so it is expected to move less.")
+    # Validity is what the constraint guarantees; correctness is a separate matter. Say
+    # which one actually moved, because on this checkpoint they came apart.
+    lines.append("\n## Reading\n")
+    for t in tags:
+        if t == "baseline":
+            continue
+        mal_b = base["failure_categories"].get("malformed_sql", 0)
+        mal_t = results[t]["failure_categories"].get("malformed_sql", 0)
+        d_exec = 100 * (results[t]["metrics"]["execution_accuracy"]
+                        - base["metrics"]["execution_accuracy"])
+        lines.append(f"- **{t}**: malformed SQL {mal_b} → {mal_t}, "
+                     f"execution accuracy {d_exec:+.1f} points.")
+    lines.append("- Constraining *every* question costs accuracy: execution-guided "
+                 "reranking had been using invalidity as a correctness signal, falling "
+                 "through malformed top beams to a correct lower one. Making those beams "
+                 "schema-valid promotes semantically wrong queries over correct ones.")
+    lines.append("- Applying the constraint only where no beam executes keeps that signal "
+                 "intact and still removes the malformed queries.")
     return "\n".join(lines) + "\n"
 
 
@@ -125,6 +139,8 @@ def main():
     parser.add_argument("--model", default=os.path.join(BASE_DIR, "checkpoints", "best_model"))
     parser.add_argument("--num-beams", type=int, default=4)
     parser.add_argument("--limit", type=int, default=None)
+    parser.add_argument("--reuse", action="store_true",
+                        help="rebuild the table from existing logs/ files without re-running")
     args = parser.parse_args()
 
     if not os.path.isdir(args.model):
@@ -134,7 +150,24 @@ def main():
             "config.json, model.safetensors, the tokenizer files and banglasql_config.json."
         )
 
-    results = {tag: run_arm(tag, extra, args) for tag, _, extra in ARMS}
+    if args.reuse:
+        # build_table renders whichever arms are present, so a split that has only some of
+        # them — or a logs/ directory written before the fallback arm existed — should
+        # produce a smaller table rather than a FileNotFoundError.
+        results = {}
+        for tag, _, _ in ARMS:
+            path = os.path.join(LOGS_DIR, f"{args.split}_{tag}_results.json")
+            if not os.path.exists(path):
+                print(f"skipping {tag}: no {os.path.basename(path)}")
+                continue
+            with open(path, encoding="utf-8") as f:
+                results[tag] = json.load(f)
+            results[tag].setdefault("wall_seconds", 0.0)
+        if "baseline" not in results:
+            raise SystemExit(f"Need at least {args.split}_baseline_results.json to build "
+                             f"the table; run without --reuse first.")
+    else:
+        results = {tag: run_arm(tag, extra, args) for tag, _, extra in ARMS}
 
     table = build_table(results, args.split)
     os.makedirs(LOGS_DIR, exist_ok=True)

@@ -140,7 +140,7 @@ is aborted after 5 seconds.
 | 5 | duplicate-column rejection, gold-query audit (+ trained 10 epochs longer) | **58.7%** | 34.8% | 91.7% |
 | 6 | patience 5→10, orphan ASC/DESC rejection, run-on phrasing repair | 54.6% | 34.8% | 90.9% |
 | 7 | dataset audited and rebuilt: 13 gold errors fixed, database repopulated, loopholes closed | 55.0% | **50.4%** | 85.2% |
-| 8 | আগে/পরে polarity rule, aggregate aliases removed, target length 128→160 | *pending* | | |
+| 8 | আগে/পরে polarity rule, aggregate aliases removed, target length 128→160 | **59.6%** | 51.1% | **96.0%** |
 
 Run 7's component results confirmed the audit: `select` accuracy 44.5% → **75.8%** after
 every returned column was named in the question, `having` 40% → **100%** after aliases

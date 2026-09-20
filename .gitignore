@@ -41,6 +41,7 @@ Thumbs.db
 checkpoints/
 *.bin
 *.safetensors
+best_model*/
 
 # W&B
 wandb/

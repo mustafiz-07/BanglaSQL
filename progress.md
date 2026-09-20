@@ -29,7 +29,7 @@ correct but written with a different alias or column order.
 | 5 | duplicate-column rejection, gold-query audit (+ trained 10 epochs longer) | **58.7%** | 34.8% | 91.7% |
 | 6 | patience 5→10, orphan ASC/DESC rejection, run-on phrasing repair | 54.6% | 34.8% | 90.9% |
 | 7 | **dataset rebuilt** — 13 question/SQL errors fixed, database repopulated, every loophole closed | 55.0% | **50.4%** | 85.2% |
-| 8 | আগে/পরে polarity rule, aggregate aliases removed, target length 128→160 | *pending* | | |
+| 8 | আগে/পরে polarity rule, aggregate aliases removed, target length 128→160 | **59.6%** | 51.1% | **96.0%** |
 
 **Headline numbers are only comparable from run 4 onward.** Runs 0→4 each rebuilt the
 test set, so the exec-accuracy column above tracks four different test sets. Runs 3 and
@@ -943,7 +943,7 @@ than score.
 
 ---
 
-## Run 8 — pay back run 7's costs *(prepared, not yet trained)*
+## Run 8 — pay back run 7's costs
 
 > **Addresses run 7's failures:** the missing আগে/পরে polarity pair (2), the bare-alias
 > failure that alias standardisation created (1), the two questions whose sort column the
@@ -1025,16 +1025,56 @@ Dataset: 2,064 pairs — 1,494 train / 243 dev / 327 test, from 165 / 28 / 34 te
 333 distinct train SQL, 0 leakage. The answer-leakage guard dropped 45 examples, up from
 24, because removing aliases made more queries textually identical.
 
-### What to check when it finishes
+### What it produced
 
-1. `easy_015`, which was 0/15 purely because পরে never appeared in training. This is the
-   cleanest prediction in the project — if it does not move, the polarity augmentation is
-   not reaching the model.
-2. Validity rate and `malformed_sql`. 23 of run 7's 52 malformed queries referenced an
-   undefined alias; that category should be empty.
-3. `having`, which run 7 took to 100%. Repeating the aggregate expression is a different
-   burden from reusing a name, so this is the main risk the change introduces.
-4. `easy_026`, 0/9 across runs 5, 6 and 7 for three different reasons.
+Both targeted predictions came true exactly.
+
+| | run 7 | run 8 |
+|---|---|---|
+| **validity rate** | 85.2% | **96.0%** (+10.8) |
+| execution accuracy | 55.0% | **59.6%** (+4.6) |
+| exact match | 50.4% | 51.1% |
+| `malformed_sql` failures | 52 | **13** (−39) |
+| `easy_015` (the পরে gap) | **0/15** | **12/12** |
+| `easy_026` (unnamed sort column) | **0/9** | **9/9** |
+| templates scoring zero | 13 | 11 |
+
+Training ran 22 epochs with the best at epoch 12 (dev execution accuracy 0.576).
+95% CI over the 34 test templates: 0.428–0.772.
+
+| component | run 7 | run 8 | |
+|---|---|---|---|
+| `where` | 65.3% | 87.1% | +21.9 |
+| `group_by` | 60.9% | 82.5% | +21.5 |
+| `join` | 68.3% | 72.5% | +4.2 |
+| `having` | 100% | 100% | — |
+| `tables` | 85.8% | 82.6% | −3.2 |
+| `aggregate` | 78.6% | 73.6% | −5.0 |
+| `order_by` | 53.8% | 46.2% | −7.7 |
+| `select` | 75.8% | 63.6% | −12.2 |
+
+Removing aliases did what it was for: the bare-alias failure is gone, and validity rose
+almost 11 points. `easy_015` going from 0/15 to 12/12 is the cleanest confirmation in the
+project that a single missing augmentation rule was the entire cause.
+
+### Where it failed, and why
+
+**`wrong_table` more than doubled, 21 → 44, and is now the largest category.** 34 of the
+44 add a table the gold does not use — typically joining `courses` to project
+`c.course_name` where gold wanted `COUNT(e.course_id)`. The query is schema-valid and
+executes; it simply answers a different question. `select` falling 12 points is the same
+phenomenon seen from the projection side.
+
+**The 13 remaining malformed queries are all one class.** Every one references a column
+whose table was never joined (`e.grade`, `c.course_name`, `e.course_id`). Replayed through
+the schema grammar, **13 of 13** are caught — all by EOS gating on an unbound alias.
+
+### Note on the constrained-decoding ablation
+
+The first ablation run returned byte-identical predictions for both arms. That was a
+wiring bug, not a result: `evaluate.py` built no decoder, so `--constrained` changed only
+a label in the output file. Fixed, and `evaluate.py` now aborts if the constraint never
+restricts a step. See `constrained_decoding.md`.
 
 ---
 

@@ -46,26 +46,37 @@ class ConstrainedDecoder:
                       "fallback_empty": 0}
 
     def allowed_tokens(self, token_ids) -> list[int]:
-        """The token ids that may legally follow the sequence generated so far."""
+        """The token ids that may legally follow the sequence generated so far.
+
+        The two constraints are combined rather than branched between. Returning early
+        from the identifier branch silently skipped the EOS gate, and since a completed
+        identifier admits terminators — end-of-sequence among them — a beam sitting at
+        `SELECT c.course_name FROM courses` could stop with `c` still unbound. That is the
+        exact failure the gate was written to prevent, so the gate has to be decided first
+        and then applied to whichever candidate set the state produced.
+        """
         self.stats["calls"] += 1
         text = self.tokenizer.decode(token_ids, skip_special_tokens=True)
         state = parse_prefix(text, self.schema)
 
+        # EOS is withheld while an alias is still unbound, unless the beam is close enough
+        # to max_length that it needs a way out.
+        block_eos = bool(self.eos_gating and state.pending
+                         and len(token_ids) < self.max_length - EOS_GATE_MARGIN)
+        if block_eos:
+            self.stats["eos_blocked"] += 1
+
         if state.kind != FREE:
-            allowed = self.filter.allowed(state.names, state.partial, state.needs_space)
+            allowed = self.filter.allowed(state.names, state.partial, state.needs_space,
+                                          allow_eos=not block_eos)
             if allowed:
                 self.stats["identifier_constrained"] += 1
                 return allowed
             # Nothing can satisfy the constraint — the model is somewhere the grammar does
             # not model. Fail open rather than force a wrong identifier.
             self.stats["fallback_empty"] += 1
-            return self.filter.all_ids
 
-        if self.eos_gating and state.pending and len(token_ids) < self.max_length - EOS_GATE_MARGIN:
-            self.stats["eos_blocked"] += 1
-            return self.filter.all_but_eos
-
-        return self.filter.all_ids
+        return self.filter.all_but_eos if block_eos else self.filter.all_ids
 
     def prefix_fn(self):
         """The callable `generate(prefix_allowed_tokens_fn=...)` expects."""

@@ -232,11 +232,23 @@ def main():
     parser.add_argument("--num-beams", type=int, default=4)
     parser.add_argument("--limit", type=int, default=None, help="evaluate only the first N examples")
     parser.add_argument("--constrained", action="store_true",
-                        help="restrict generation to schema-valid continuations")
+                        help="restrict generation to schema-valid continuations at every step")
+    parser.add_argument("--constrained-fallback", action="store_true",
+                        help="generate unconstrained first, and re-generate with the "
+                             "constraint only for questions where no beam executes")
     parser.add_argument("--tag", default="",
                         help="suffix for the output filenames, so two decoders can be "
                              "compared without overwriting each other")
     args = parser.parse_args()
+
+    # The two constraint modes are alternatives. Accepting both silently ran fallback
+    # while the results file recorded "constrained": true and a decoding label naming
+    # both — a mislabelled arm, which is the same hazard that made run 8's first ablation
+    # look like a result when nothing had been constrained at all.
+    if args.constrained and args.constrained_fallback:
+        raise SystemExit("--constrained and --constrained-fallback are alternatives: the "
+                         "first constrains every question, the second only those with no "
+                         "executable beam. Pick one.")
 
     if not os.path.isdir(args.model):
         raise SystemExit(f"Checkpoint not found: {args.model}\nTrain a model first (python train.py).")
@@ -260,10 +272,59 @@ def main():
     tokenizer = AutoTokenizer.from_pretrained(args.model)
     model     = AutoModelForSeq2SeqLM.from_pretrained(args.model)
 
+    decoder = None
+    if args.constrained or args.constrained_fallback:
+        from constrained_decode import ConstrainedDecoder
+        decoder = ConstrainedDecoder(tokenizer, max_length=int(config["max_target_length"]))
+        if not decoder.schema.table_names:
+            raise SystemExit("Schema is empty — is banglasql.db present? "
+                             "Constrained decoding would silently do nothing.")
+        print(f"\nSchema-constrained decoding: {len(decoder.schema.table_names)} tables, "
+              f"{len(decoder.schema.all_columns)} columns")
+
+    questions = [p["bangla_question"] for p in pairs]
     print("\nGenerating SQL...")
     candidates = generate_candidates(
-        model, tokenizer, [p["bangla_question"] for p in pairs], config, args.num_beams,
+        model, tokenizer, questions, config, args.num_beams,
+        decoder=None if args.constrained_fallback else decoder,
     )
+
+    stuck = []
+    if args.constrained_fallback:
+        # Constraining every question costs accuracy, because execution-guided reranking
+        # was using invalidity as a free correctness signal: when the top beams are
+        # malformed, reranking falls through to a lower beam that is often right. Making
+        # those beams schema-valid promotes semantically wrong queries over correct ones —
+        # 10 of run 8's regressions were valid-but-wrong queries displacing a correct
+        # lower beam. So constrain only where reranking has nothing to fall through to.
+        probe = open_readonly_db()
+        stuck = [i for i, beams in enumerate(candidates)
+                 if all(run_sql(probe, sql)[1] is not None for sql in beams)]
+        probe.close()
+        print(f"\n{len(stuck)} question(s) have no executable beam — re-generating those "
+              f"with the constraint")
+        if stuck:
+            redone = generate_candidates(
+                model, tokenizer, [questions[i] for i in stuck], config, args.num_beams,
+                decoder=decoder,
+            )
+            for i, beams in zip(stuck, redone):
+                candidates[i] = beams
+
+    if decoder is not None:
+        print("  " + decoder.report())
+        # A constraint that never fired is a wiring failure, not a result. Run 8's first
+        # ablation returned byte-identical predictions for both arms because main() built
+        # no decoder at all, and only the label in the results file differed.
+        #
+        # In fallback mode the decoder is only invoked for questions with no executable
+        # beam, so zero constrained steps is the *success* case when there were none —
+        # checking it there would abort a run that worked. Assert only when the decoder
+        # was actually asked to generate something.
+        expected_to_fire = args.constrained or (args.constrained_fallback and stuck)
+        if expected_to_fire and decoder.stats["identifier_constrained"] == 0:
+            raise SystemExit("Constrained decoding never restricted a single step — "
+                             "the constraint is not reaching generation.")
 
     print("Executing queries against the database...")
     con = open_readonly_db()
@@ -283,8 +344,11 @@ def main():
         "checkpoint": args.model,
         "num_examples": total,
         "num_beams": args.num_beams,
-        "decoding": "execution_guided" + ("+schema_constrained" if args.constrained else ""),
+        "decoding": ("execution_guided"
+                     + ("+schema_constrained" if args.constrained else "")
+                     + ("+schema_constrained_fallback" if args.constrained_fallback else "")),
         "constrained": bool(args.constrained),
+        "constrained_fallback": bool(args.constrained_fallback),
         **guided,
         "top1_metrics": top1["metrics"],
     }
