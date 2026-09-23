@@ -1,0 +1,26 @@
+# BanglaSQL Project Dependencies
+
+# Core
+transformers==4.45.2
+datasets==3.0.1
+torch==2.5.0
+sentencepiece==0.2.0
+accelerate==0.34.2
+
+# Database
+sqlalchemy==2.0.35
+
+# Data Generation
+faker==30.3.0
+
+# Evaluation & Utilities
+pandas==2.2.3
+numpy==1.26.4
+matplotlib==3.9.2
+scikit-learn==1.5.2
+
+# Demo Interface
+streamlit==1.38.0
+
+# Experiment Logging (optional)
+# wandb==0.18.3

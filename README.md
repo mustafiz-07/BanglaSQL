@@ -17,7 +17,7 @@ python evaluate.py           # execution accuracy + error analysis on the test s
 streamlit run app.py         # demo: Bangla question → SQL → result table
 ```
 
-Training needs a GPU. Open [colab_train.ipynb](colab_train.ipynb) in Google Colab,
+Training needs a GPU. Open [colab_demo.ipynb](colab_demo.ipynb) in Google Colab,
 set `Runtime → Change runtime type → T4 GPU`, point Step 2 at your repo URL, and
 run the cells in order. Start from a fresh runtime (`Runtime → Disconnect and delete
 runtime`) so Step 2 clones the latest code rather than reusing an old checkout.
@@ -129,6 +129,23 @@ python evaluate.py --split test          # → logs/test_results.json
 The database is opened read-only, non-`SELECT` statements are rejected, and each query
 is aborted after 5 seconds.
 
+### Schema-constrained decoding (model contribution)
+
+Runs 1–8 improved data, not the model. `--constrained` and `--constrained-fallback` add an
+inference-time contribution: token masking during beam search so only schema-valid
+continuations are reachable — a real table after `FROM`/`JOIN`, a column of the right table
+after `c.`, and no end-of-sequence while an alias is still unbound. No retraining.
+
+```bash
+python evaluate.py --constrained-fallback   # constrain only where no beam executes
+```
+
+On the run 8 checkpoint: validity 96.0% → **98.2%** and malformed SQL 13 → **6**.
+Constraining every question costs 2.8 accuracy points, because it makes malformed beams
+valid-but-wrong and so defeats execution-guided reranking; the fallback mode avoids that
+and holds accuracy at 59.6%. It guarantees schema validity but does not, on this
+checkpoint, improve correctness. See [constrained_decoding.md](constrained_decoding.md).
+
 ## Results
 
 | run | setup | test exec. acc. | exact match | validity |
@@ -141,6 +158,7 @@ is aborted after 5 seconds.
 | 6 | patience 5→10, orphan ASC/DESC rejection, run-on phrasing repair | 54.6% | 34.8% | 90.9% |
 | 7 | dataset audited and rebuilt: 13 gold errors fixed, database repopulated, loopholes closed | 55.0% | **50.4%** | 85.2% |
 | 8 | আগে/পরে polarity rule, aggregate aliases removed, target length 128→160 | **59.6%** | 51.1% | **96.0%** |
+| 8 + fallback | + schema-constrained decoding where no beam executes (inference only) | 59.6% | 51.1% | **98.2%** |
 
 Run 7's component results confirmed the audit: `select` accuracy 44.5% → **75.8%** after
 every returned column was named in the question, `having` 40% → **100%** after aliases
@@ -222,13 +240,15 @@ docker compose run --rm banglasql bash
 nlp/
 ├── BanglaSQL_Project_Plan.md   # Full project plan
 ├── progress.md                 # Run-by-run log: setup, results, failures, fixes
-├── colab_train.ipynb           # Colab notebook — train + evaluate + curves
+├── colab_demo.ipynb            # Colab notebook — the whole pipeline end to end, plus a live demo
 ├── common.py                   # Shared input formatting, config, SQL execution helpers
 ├── create_database.py          # Schema + synthetic data generator
 ├── build_dataset.py            # Value-slot + paraphrase augmentation, split pipeline
 ├── preprocess_check.py         # Tokenizer analysis + normalization + length profiling
 ├── train.py                    # Seq2Seq fine-tuning
-├── evaluate.py                 # Execution accuracy + error analysis
+├── evaluate.py                 # Execution accuracy + error analysis (+ --constrained modes)
+├── schema_grammar.py           # Schema index, SQL prefix parser, token filter
+├── constrained_decode.py       # Constrained decoder for generate(prefix_allowed_tokens_fn=...)
 ├── app.py                      # Streamlit demo
 ├── data/
 │   ├── templates.json          # 228 hand-crafted Bangla question–SQL pairs

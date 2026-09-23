@@ -1,0 +1,2566 @@
+[
+  {
+    "template_id": "easy_001",
+    "difficulty": "easy",
+    "tables_used": [
+      "students"
+    ],
+    "query_type": "select_all",
+    "bangla_question": "সকল শিক্ষার্থীর তালিকা দাও।",
+    "sql_query": "SELECT * FROM students;"
+  },
+  {
+    "template_id": "easy_002",
+    "difficulty": "easy",
+    "tables_used": [
+      "students"
+    ],
+    "query_type": "select_where",
+    "bangla_question": "যেসব শিক্ষার্থীর CGPA ৩.৫-এর বেশি তাদের নাম দাও।",
+    "sql_query": "SELECT first_name, last_name FROM students WHERE cgpa > 3.5;"
+  },
+  {
+    "template_id": "easy_003",
+    "difficulty": "easy",
+    "tables_used": [
+      "students"
+    ],
+    "query_type": "select_where",
+    "bangla_question": "যেসব শিক্ষার্থী ২০২২ সালে ভর্তি হয়েছে তাদের দেখাও।",
+    "sql_query": "SELECT * FROM students WHERE year_of_admission = 2022;"
+  },
+  {
+    "template_id": "easy_004",
+    "difficulty": "easy",
+    "tables_used": [
+      "students"
+    ],
+    "query_type": "select_where",
+    "bangla_question": "যেসব শিক্ষার্থীর CGPA ৩.০-এর কম তাদের নাম ও CGPA দাও।",
+    "sql_query": "SELECT first_name, last_name, cgpa FROM students WHERE cgpa < 3.0;"
+  },
+  {
+    "template_id": "easy_005",
+    "difficulty": "easy",
+    "tables_used": [
+      "students"
+    ],
+    "query_type": "order_by",
+    "bangla_question": "সকল শিক্ষার্থীকে CGPA-র অবরোহী ক্রমে সাজাও।",
+    "sql_query": "SELECT first_name, last_name, cgpa FROM students ORDER BY cgpa DESC;"
+  },
+  {
+    "template_id": "easy_006",
+    "difficulty": "easy",
+    "tables_used": [
+      "students"
+    ],
+    "query_type": "select_where",
+    "bangla_question": "যেসব শিক্ষার্থীর CGPA ৩.৭৫-এর বেশি বা সমান তাদের তালিকা দাও।",
+    "sql_query": "SELECT * FROM students WHERE cgpa >= 3.75;"
+  },
+  {
+    "template_id": "easy_007",
+    "difficulty": "easy",
+    "tables_used": [
+      "students"
+    ],
+    "query_type": "select_where",
+    "bangla_question": "যেসব শিক্ষার্থী ২০২০ সালের আগে ভর্তি হয়েছে তাদের দেখাও।",
+    "sql_query": "SELECT * FROM students WHERE year_of_admission < 2020;"
+  },
+  {
+    "template_id": "easy_008",
+    "difficulty": "easy",
+    "tables_used": [
+      "students"
+    ],
+    "query_type": "limit",
+    "bangla_question": "প্রথম ১০ জন শিক্ষার্থীর তথ্য দাও।",
+    "sql_query": "SELECT * FROM students LIMIT 10;"
+  },
+  {
+    "template_id": "easy_009",
+    "difficulty": "easy",
+    "tables_used": [
+      "students"
+    ],
+    "query_type": "select_where",
+    "bangla_question": "২০২৩ সালে ভর্তি হওয়া শিক্ষার্থীদের নাম ও CGPA দাও।",
+    "sql_query": "SELECT first_name, last_name, cgpa FROM students WHERE year_of_admission = 2023;"
+  },
+  {
+    "template_id": "easy_010",
+    "difficulty": "easy",
+    "tables_used": [
+      "students"
+    ],
+    "query_type": "order_by_limit",
+    "bangla_question": "সর্বোচ্চ CGPA সহ শীর্ষ ৫ জন শিক্ষার্থীর নাম ও CGPA দাও।",
+    "sql_query": "SELECT first_name, last_name, cgpa FROM students ORDER BY cgpa DESC LIMIT 5;"
+  },
+  {
+    "template_id": "easy_011",
+    "difficulty": "easy",
+    "tables_used": [
+      "instructors"
+    ],
+    "query_type": "select_all",
+    "bangla_question": "সকল শিক্ষকের তালিকা দাও।",
+    "sql_query": "SELECT * FROM instructors;"
+  },
+  {
+    "template_id": "easy_012",
+    "difficulty": "easy",
+    "tables_used": [
+      "instructors"
+    ],
+    "query_type": "select_where",
+    "bangla_question": "যেসব শিক্ষক প্রফেসর পদে আছেন তাদের নাম দাও।",
+    "sql_query": "SELECT first_name, last_name FROM instructors WHERE designation = 'Professor';"
+  },
+  {
+    "template_id": "easy_013",
+    "difficulty": "easy",
+    "tables_used": [
+      "instructors"
+    ],
+    "query_type": "select_where",
+    "bangla_question": "যেসব শিক্ষক ২০১০ সালের আগে যোগ দিয়েছেন তাদের দেখাও।",
+    "sql_query": "SELECT * FROM instructors WHERE joining_year < 2010;"
+  },
+  {
+    "template_id": "easy_014",
+    "difficulty": "easy",
+    "tables_used": [
+      "instructors"
+    ],
+    "query_type": "select_where",
+    "bangla_question": "লেকচারার পদমর্যাদার শিক্ষকদের নাম ও ইমেইল দাও।",
+    "sql_query": "SELECT first_name, last_name, email FROM instructors WHERE designation = 'Lecturer';"
+  },
+  {
+    "template_id": "easy_015",
+    "difficulty": "easy",
+    "tables_used": [
+      "instructors"
+    ],
+    "query_type": "select_where",
+    "bangla_question": "২০১৫ সালের পরে যোগ দেওয়া শিক্ষকদের তালিকা দাও।",
+    "sql_query": "SELECT * FROM instructors WHERE joining_year > 2015;"
+  },
+  {
+    "template_id": "easy_016",
+    "difficulty": "easy",
+    "tables_used": [
+      "instructors"
+    ],
+    "query_type": "order_by",
+    "bangla_question": "সকল শিক্ষককে যোগদানের বছর অনুযায়ী আরোহী ক্রমে সাজাও।",
+    "sql_query": "SELECT first_name, last_name, joining_year FROM instructors ORDER BY joining_year ASC;"
+  },
+  {
+    "template_id": "easy_017",
+    "difficulty": "easy",
+    "tables_used": [
+      "instructors"
+    ],
+    "query_type": "select_where",
+    "bangla_question": "সহকারী অধ্যাপক পদমর্যাদার শিক্ষকদের তালিকা দাও।",
+    "sql_query": "SELECT * FROM instructors WHERE designation = 'Assistant Professor';"
+  },
+  {
+    "template_id": "easy_018",
+    "difficulty": "easy",
+    "tables_used": [
+      "instructors"
+    ],
+    "query_type": "select_where",
+    "bangla_question": "সহযোগী অধ্যাপক পদমর্যাদার শিক্ষকদের নাম দাও।",
+    "sql_query": "SELECT first_name, last_name FROM instructors WHERE designation = 'Associate Professor';"
+  },
+  {
+    "template_id": "easy_019",
+    "difficulty": "easy",
+    "tables_used": [
+      "departments"
+    ],
+    "query_type": "select_all",
+    "bangla_question": "সকল বিভাগের তালিকা দাও।",
+    "sql_query": "SELECT * FROM departments;"
+  },
+  {
+    "template_id": "easy_020",
+    "difficulty": "easy",
+    "tables_used": [
+      "departments"
+    ],
+    "query_type": "select_column",
+    "bangla_question": "সকল বিভাগের নাম দাও।",
+    "sql_query": "SELECT dept_name FROM departments;"
+  },
+  {
+    "template_id": "easy_021",
+    "difficulty": "easy",
+    "tables_used": [
+      "departments"
+    ],
+    "query_type": "select_where",
+    "bangla_question": "'Building A'-তে অবস্থিত বিভাগের তথ্য দাও।",
+    "sql_query": "SELECT * FROM departments WHERE building = 'Building A';"
+  },
+  {
+    "template_id": "easy_022",
+    "difficulty": "easy",
+    "tables_used": [
+      "courses"
+    ],
+    "query_type": "select_all",
+    "bangla_question": "সকল কোর্সের তালিকা দাও।",
+    "sql_query": "SELECT * FROM courses;"
+  },
+  {
+    "template_id": "easy_023",
+    "difficulty": "easy",
+    "tables_used": [
+      "courses"
+    ],
+    "query_type": "select_where",
+    "bangla_question": "৩ ক্রেডিটের কোর্সগুলোর তালিকা দাও।",
+    "sql_query": "SELECT * FROM courses WHERE credits = 3;"
+  },
+  {
+    "template_id": "easy_024",
+    "difficulty": "easy",
+    "tables_used": [
+      "courses"
+    ],
+    "query_type": "select_where",
+    "bangla_question": "৪ ক্রেডিটের কোর্সের নাম ও কোড দাও।",
+    "sql_query": "SELECT course_code, course_name FROM courses WHERE credits = 4;"
+  },
+  {
+    "template_id": "easy_025",
+    "difficulty": "easy",
+    "tables_used": [
+      "courses"
+    ],
+    "query_type": "select_where",
+    "bangla_question": "'Spring 2024' সেমিস্টারে অফার করা কোর্সগুলো দেখাও।",
+    "sql_query": "SELECT * FROM courses WHERE semester = 'Spring 2024';"
+  },
+  {
+    "template_id": "easy_026",
+    "difficulty": "easy",
+    "tables_used": [
+      "courses"
+    ],
+    "query_type": "order_by",
+    "bangla_question": "ক্রেডিট অনুযায়ী অবরোহী ক্রমে সাজিয়ে কোর্সগুলোর কোড, নাম ও ক্রেডিট দেখাও।",
+    "sql_query": "SELECT course_code, course_name, credits FROM courses ORDER BY credits DESC;"
+  },
+  {
+    "template_id": "easy_027",
+    "difficulty": "easy",
+    "tables_used": [
+      "courses"
+    ],
+    "query_type": "select_where",
+    "bangla_question": "'Fall 2023' সেমিস্টারে অনুষ্ঠিত কোর্সের নাম দাও।",
+    "sql_query": "SELECT course_name FROM courses WHERE semester = 'Fall 2023';"
+  },
+  {
+    "template_id": "easy_028",
+    "difficulty": "easy",
+    "tables_used": [
+      "enrollments"
+    ],
+    "query_type": "select_where",
+    "bangla_question": "যেসব শিক্ষার্থী A+ গ্রেড পেয়েছে তাদের enrollment ID দাও।",
+    "sql_query": "SELECT enrollment_id FROM enrollments WHERE grade = 'A+';"
+  },
+  {
+    "template_id": "easy_029",
+    "difficulty": "easy",
+    "tables_used": [
+      "enrollments"
+    ],
+    "query_type": "select_where",
+    "bangla_question": "যেসব শিক্ষার্থী F গ্রেড পেয়েছে তাদের তথ্য দাও।",
+    "sql_query": "SELECT * FROM enrollments WHERE grade = 'F';"
+  },
+  {
+    "template_id": "easy_030",
+    "difficulty": "easy",
+    "tables_used": [
+      "enrollments"
+    ],
+    "query_type": "select_where",
+    "bangla_question": "৩.০-এর বেশি গ্রেড পয়েন্ট পেয়েছে এমন enrollment-এর তালিকা দাও।",
+    "sql_query": "SELECT * FROM enrollments WHERE grade_point > 3.0;"
+  },
+  {
+    "template_id": "easy_031",
+    "difficulty": "easy",
+    "tables_used": [
+      "enrollments"
+    ],
+    "query_type": "select_where",
+    "bangla_question": "কোর্স আইডি ১-এর সমস্ত নথিভুক্তির তথ্য দাও।",
+    "sql_query": "SELECT * FROM enrollments WHERE course_id = 1;"
+  },
+  {
+    "template_id": "easy_032",
+    "difficulty": "easy",
+    "tables_used": [
+      "enrollments"
+    ],
+    "query_type": "order_by_limit",
+    "bangla_question": "সর্বোচ্চ গ্রেড পয়েন্ট পাওয়া শীর্ষ ৫টি enrollment দেখাও।",
+    "sql_query": "SELECT * FROM enrollments ORDER BY grade_point DESC LIMIT 5;"
+  },
+  {
+    "template_id": "easy_033",
+    "difficulty": "easy",
+    "tables_used": [
+      "attendance"
+    ],
+    "query_type": "select_where",
+    "bangla_question": "যেসব শিক্ষার্থী অনুপস্থিত ছিল তাদের তথ্য দাও।",
+    "sql_query": "SELECT * FROM attendance WHERE status = 'Absent';"
+  },
+  {
+    "template_id": "easy_034",
+    "difficulty": "easy",
+    "tables_used": [
+      "attendance"
+    ],
+    "query_type": "select_where",
+    "bangla_question": "যেসব শিক্ষার্থী বিলম্বে উপস্থিত হয়েছিল তাদের তথ্য দাও।",
+    "sql_query": "SELECT * FROM attendance WHERE status = 'Late';"
+  },
+  {
+    "template_id": "easy_035",
+    "difficulty": "easy",
+    "tables_used": [
+      "attendance"
+    ],
+    "query_type": "select_where",
+    "bangla_question": "'2024-03-15' তারিখে উপস্থিত ছিল এমন শিক্ষার্থীদের তথ্য দাও।",
+    "sql_query": "SELECT * FROM attendance WHERE date = '2024-03-15' AND status = 'Present';"
+  },
+  {
+    "template_id": "easy_036",
+    "difficulty": "easy",
+    "tables_used": [
+      "students"
+    ],
+    "query_type": "select_where",
+    "bangla_question": "যেসব শিক্ষার্থীর CGPA ৩.০ এবং ৩.৫-এর মধ্যে তাদের নাম দাও।",
+    "sql_query": "SELECT first_name, last_name, cgpa FROM students WHERE cgpa BETWEEN 3.0 AND 3.5;"
+  },
+  {
+    "template_id": "easy_037",
+    "difficulty": "easy",
+    "tables_used": [
+      "students"
+    ],
+    "query_type": "select_where",
+    "bangla_question": "বিভাগ আইডি ১-এর শিক্ষার্থীদের তালিকা দাও।",
+    "sql_query": "SELECT * FROM students WHERE dept_id = 1;"
+  },
+  {
+    "template_id": "easy_038",
+    "difficulty": "easy",
+    "tables_used": [
+      "students"
+    ],
+    "query_type": "select_where",
+    "bangla_question": "২০২১ থেকে ২০২৩ সালের মধ্যে ভর্তি হওয়া শিক্ষার্থীদের দেখাও।",
+    "sql_query": "SELECT * FROM students WHERE year_of_admission BETWEEN 2021 AND 2023;"
+  },
+  {
+    "template_id": "easy_039",
+    "difficulty": "easy",
+    "tables_used": [
+      "courses"
+    ],
+    "query_type": "select_where",
+    "bangla_question": "বিভাগ আইডি ১-এর কোর্সগুলোর নাম ও কোড দাও।",
+    "sql_query": "SELECT course_code, course_name FROM courses WHERE dept_id = 1;"
+  },
+  {
+    "template_id": "easy_040",
+    "difficulty": "easy",
+    "tables_used": [
+      "instructors"
+    ],
+    "query_type": "limit",
+    "bangla_question": "যেকোনো ৫ জন শিক্ষকের নাম ও পদমর্যাদা দাও।",
+    "sql_query": "SELECT first_name, last_name, designation FROM instructors LIMIT 5;"
+  },
+  {
+    "template_id": "easy_041",
+    "difficulty": "easy",
+    "tables_used": [
+      "students"
+    ],
+    "query_type": "select_where",
+    "bangla_question": "যেসব শিক্ষার্থীর CGPA ঠিক ৩.৫ তাদের নাম দাও।",
+    "sql_query": "SELECT first_name, last_name FROM students WHERE cgpa = 3.5;"
+  },
+  {
+    "template_id": "easy_042",
+    "difficulty": "easy",
+    "tables_used": [
+      "enrollments"
+    ],
+    "query_type": "select_where",
+    "bangla_question": "শিক্ষার্থী আইডি ১-এর সমস্ত enrollment দেখাও।",
+    "sql_query": "SELECT * FROM enrollments WHERE student_id = 1;"
+  },
+  {
+    "template_id": "easy_043",
+    "difficulty": "easy",
+    "tables_used": [
+      "attendance"
+    ],
+    "query_type": "select_where",
+    "bangla_question": "শিক্ষার্থী আইডি ২-এর সমস্ত উপস্থিতির তথ্য দাও।",
+    "sql_query": "SELECT * FROM attendance WHERE student_id = 2;"
+  },
+  {
+    "template_id": "easy_044",
+    "difficulty": "easy",
+    "tables_used": [
+      "courses"
+    ],
+    "query_type": "select_where",
+    "bangla_question": "ইন্সট্রাক্টর আইডি ৩-এর পড়ানো কোর্সগুলো দেখাও।",
+    "sql_query": "SELECT * FROM courses WHERE instructor_id = 3;"
+  },
+  {
+    "template_id": "easy_045",
+    "difficulty": "easy",
+    "tables_used": [
+      "students"
+    ],
+    "query_type": "order_by",
+    "bangla_question": "শিক্ষার্থীদের ভর্তির বছর অনুযায়ী সাজিয়ে দেখাও।",
+    "sql_query": "SELECT first_name, last_name, year_of_admission FROM students ORDER BY year_of_admission ASC;"
+  },
+  {
+    "template_id": "easy_046",
+    "difficulty": "easy",
+    "tables_used": [
+      "enrollments"
+    ],
+    "query_type": "select_where",
+    "bangla_question": "যেসব শিক্ষার্থী A বা A+ গ্রেড পেয়েছে তাদের enrollment তথ্য দাও।",
+    "sql_query": "SELECT * FROM enrollments WHERE grade IN ('A', 'A+');"
+  },
+  {
+    "template_id": "easy_047",
+    "difficulty": "easy",
+    "tables_used": [
+      "attendance"
+    ],
+    "query_type": "select_where",
+    "bangla_question": "কোর্স আইডি ২-এর উপস্থিতির তথ্য দাও।",
+    "sql_query": "SELECT * FROM attendance WHERE course_id = 2;"
+  },
+  {
+    "template_id": "easy_048",
+    "difficulty": "easy",
+    "tables_used": [
+      "students"
+    ],
+    "query_type": "select_column",
+    "bangla_question": "সকল শিক্ষার্থীর নাম ও ইমেইল ঠিকানা দাও।",
+    "sql_query": "SELECT first_name, last_name, email FROM students;"
+  },
+  {
+    "template_id": "easy_049",
+    "difficulty": "easy",
+    "tables_used": [
+      "instructors"
+    ],
+    "query_type": "select_where",
+    "bangla_question": "বিভাগ আইডি ২-এর শিক্ষকদের তালিকা দাও।",
+    "sql_query": "SELECT * FROM instructors WHERE dept_id = 2;"
+  },
+  {
+    "template_id": "easy_050",
+    "difficulty": "easy",
+    "tables_used": [
+      "courses"
+    ],
+    "query_type": "select_column",
+    "bangla_question": "সকল কোর্সের কোড ও নাম দাও।",
+    "sql_query": "SELECT course_code, course_name FROM courses;"
+  },
+  {
+    "template_id": "easy_051",
+    "difficulty": "easy",
+    "tables_used": [
+      "enrollments"
+    ],
+    "query_type": "select_where",
+    "bangla_question": "২.৫-এর কম গ্রেড পয়েন্ট পাওয়া enrollment-গুলো দেখাও।",
+    "sql_query": "SELECT * FROM enrollments WHERE grade_point < 2.5;"
+  },
+  {
+    "template_id": "easy_052",
+    "difficulty": "easy",
+    "tables_used": [
+      "students"
+    ],
+    "query_type": "select_where",
+    "bangla_question": "বিভাগ আইডি ৩-এর শিক্ষার্থীদের নাম ও CGPA দাও।",
+    "sql_query": "SELECT first_name, last_name, cgpa FROM students WHERE dept_id = 3;"
+  },
+  {
+    "template_id": "easy_053",
+    "difficulty": "easy",
+    "tables_used": [
+      "attendance"
+    ],
+    "query_type": "select_where",
+    "bangla_question": "'2023-01-10' তারিখের সমস্ত উপস্থিতির তথ্য দাও।",
+    "sql_query": "SELECT * FROM attendance WHERE date = '2023-01-10';"
+  },
+  {
+    "template_id": "easy_054",
+    "difficulty": "easy",
+    "tables_used": [
+      "courses"
+    ],
+    "query_type": "select_where",
+    "bangla_question": "'Summer 2024' সেমিস্টারের কোর্সের নাম ও ক্রেডিট দাও।",
+    "sql_query": "SELECT course_name, credits FROM courses WHERE semester = 'Summer 2024';"
+  },
+  {
+    "template_id": "easy_055",
+    "difficulty": "easy",
+    "tables_used": [
+      "students"
+    ],
+    "query_type": "order_by_limit",
+    "bangla_question": "সর্বনিম্ন CGPA সহ ৩ জন শিক্ষার্থীর নাম দাও।",
+    "sql_query": "SELECT first_name, last_name, cgpa FROM students ORDER BY cgpa ASC LIMIT 3;"
+  },
+  {
+    "template_id": "easy_056",
+    "difficulty": "easy",
+    "tables_used": [
+      "instructors"
+    ],
+    "query_type": "select_where",
+    "bangla_question": "২০০৫ থেকে ২০১০ সালের মধ্যে যোগ দেওয়া শিক্ষকদের নাম দাও।",
+    "sql_query": "SELECT first_name, last_name FROM instructors WHERE joining_year BETWEEN 2005 AND 2010;"
+  },
+  {
+    "template_id": "easy_057",
+    "difficulty": "easy",
+    "tables_used": [
+      "enrollments"
+    ],
+    "query_type": "select_where",
+    "bangla_question": "কোর্স আইডি ৫-এ নথিভুক্ত শিক্ষার্থীদের আইডি, গ্রেড ও গ্রেড পয়েন্ট দেখাও।",
+    "sql_query": "SELECT student_id, grade, grade_point FROM enrollments WHERE course_id = 5;"
+  },
+  {
+    "template_id": "easy_058",
+    "difficulty": "easy",
+    "tables_used": [
+      "departments"
+    ],
+    "query_type": "select_column",
+    "bangla_question": "সকল বিভাগের নাম ও বিল্ডিং দাও।",
+    "sql_query": "SELECT dept_name, building FROM departments;"
+  },
+  {
+    "template_id": "easy_059",
+    "difficulty": "easy",
+    "tables_used": [
+      "students"
+    ],
+    "query_type": "select_where",
+    "bangla_question": "২০২৪ সালে ভর্তি হওয়া শিক্ষার্থীদের নাম ও বিভাগ আইডি দাও।",
+    "sql_query": "SELECT first_name, last_name, dept_id FROM students WHERE year_of_admission = 2024;"
+  },
+  {
+    "template_id": "easy_060",
+    "difficulty": "easy",
+    "tables_used": [
+      "enrollments"
+    ],
+    "query_type": "select_where",
+    "bangla_question": "যেসব enrollment-এ গ্রেড পয়েন্ট ৪.০ তাদের তথ্য দাও।",
+    "sql_query": "SELECT * FROM enrollments WHERE grade_point = 4.0;"
+  },
+  {
+    "template_id": "medium_001",
+    "difficulty": "medium",
+    "tables_used": [
+      "students",
+      "departments"
+    ],
+    "query_type": "join",
+    "bangla_question": "প্রতিটি শিক্ষার্থীর নাম ও তাদের বিভাগের নাম দাও।",
+    "sql_query": "SELECT s.first_name, s.last_name, d.dept_name FROM students s JOIN departments d ON s.dept_id = d.dept_id;"
+  },
+  {
+    "template_id": "medium_002",
+    "difficulty": "medium",
+    "tables_used": [
+      "students",
+      "departments"
+    ],
+    "query_type": "join_where",
+    "bangla_question": "কম্পিউটার সায়েন্স বিভাগের শিক্ষার্থীদের নাম ও CGPA দাও।",
+    "sql_query": "SELECT s.first_name, s.last_name, s.cgpa FROM students s JOIN departments d ON s.dept_id = d.dept_id WHERE d.dept_name = 'Computer Science and Engineering';"
+  },
+  {
+    "template_id": "medium_003",
+    "difficulty": "medium",
+    "tables_used": [
+      "instructors",
+      "departments"
+    ],
+    "query_type": "join",
+    "bangla_question": "প্রতিটি শিক্ষকের নাম ও তাদের বিভাগের নাম দাও।",
+    "sql_query": "SELECT i.first_name, i.last_name, d.dept_name FROM instructors i JOIN departments d ON i.dept_id = d.dept_id;"
+  },
+  {
+    "template_id": "medium_004",
+    "difficulty": "medium",
+    "tables_used": [
+      "instructors",
+      "departments"
+    ],
+    "query_type": "join_where",
+    "bangla_question": "গণিত বিভাগের অধ্যাপকদের নাম দাও।",
+    "sql_query": "SELECT i.first_name, i.last_name FROM instructors i JOIN departments d ON i.dept_id = d.dept_id WHERE d.dept_name = 'Mathematics' AND i.designation = 'Professor';"
+  },
+  {
+    "template_id": "medium_005",
+    "difficulty": "medium",
+    "tables_used": [
+      "courses",
+      "instructors"
+    ],
+    "query_type": "join",
+    "bangla_question": "প্রতিটি কোর্সের নাম ও সংশ্লিষ্ট শিক্ষকের নাম দাও।",
+    "sql_query": "SELECT c.course_name, i.first_name, i.last_name FROM courses c JOIN instructors i ON c.instructor_id = i.instructor_id;"
+  },
+  {
+    "template_id": "medium_006",
+    "difficulty": "medium",
+    "tables_used": [
+      "courses",
+      "departments"
+    ],
+    "query_type": "join_where",
+    "bangla_question": "পদার্থবিজ্ঞান বিভাগের কোর্সগুলোর নাম ও ক্রেডিট দাও।",
+    "sql_query": "SELECT c.course_name, c.credits FROM courses c JOIN departments d ON c.dept_id = d.dept_id WHERE d.dept_name = 'Physics';"
+  },
+  {
+    "template_id": "medium_007",
+    "difficulty": "medium",
+    "tables_used": [
+      "students",
+      "enrollments"
+    ],
+    "query_type": "join",
+    "bangla_question": "শিক্ষার্থীদের নাম ও তাদের প্রাপ্ত গ্রেড দাও।",
+    "sql_query": "SELECT s.first_name, s.last_name, e.grade FROM students s JOIN enrollments e ON s.student_id = e.student_id;"
+  },
+  {
+    "template_id": "medium_008",
+    "difficulty": "medium",
+    "tables_used": [
+      "students",
+      "enrollments"
+    ],
+    "query_type": "join_where",
+    "bangla_question": "যেসব শিক্ষার্থী A+ গ্রেড পেয়েছে তাদের নাম দাও।",
+    "sql_query": "SELECT DISTINCT s.first_name, s.last_name FROM students s JOIN enrollments e ON s.student_id = e.student_id WHERE e.grade = 'A+';"
+  },
+  {
+    "template_id": "medium_009",
+    "difficulty": "medium",
+    "tables_used": [
+      "students",
+      "enrollments"
+    ],
+    "query_type": "join_where",
+    "bangla_question": "যেসব শিক্ষার্থী F গ্রেড পেয়েছে তাদের নাম ও বিভাগ আইডি দাও।",
+    "sql_query": "SELECT s.first_name, s.last_name, s.dept_id FROM students s JOIN enrollments e ON s.student_id = e.student_id WHERE e.grade = 'F';"
+  },
+  {
+    "template_id": "medium_010",
+    "difficulty": "medium",
+    "tables_used": [
+      "students",
+      "attendance"
+    ],
+    "query_type": "join_where",
+    "bangla_question": "কোন কোন শিক্ষার্থী কখনও অনুপস্থিত ছিল তাদের নাম দাও।",
+    "sql_query": "SELECT DISTINCT s.first_name, s.last_name FROM students s JOIN attendance a ON s.student_id = a.student_id WHERE a.status = 'Absent';"
+  },
+  {
+    "template_id": "medium_011",
+    "difficulty": "medium",
+    "tables_used": [
+      "departments",
+      "students"
+    ],
+    "query_type": "aggregate_group",
+    "bangla_question": "প্রতিটি বিভাগে কতজন শিক্ষার্থী আছে তা দেখাও।",
+    "sql_query": "SELECT d.dept_name, COUNT(s.student_id) FROM departments d JOIN students s ON d.dept_id = s.dept_id GROUP BY d.dept_name;"
+  },
+  {
+    "template_id": "medium_012",
+    "difficulty": "medium",
+    "tables_used": [
+      "departments",
+      "students"
+    ],
+    "query_type": "aggregate_group_order",
+    "bangla_question": "প্রতিটি বিভাগের গড় CGPA হিসাব করো এবং অবরোহী ক্রমে সাজাও।",
+    "sql_query": "SELECT d.dept_name, ROUND(AVG(s.cgpa), 2) FROM departments d JOIN students s ON d.dept_id = s.dept_id GROUP BY d.dept_name ORDER BY ROUND(AVG(s.cgpa), 2) DESC;"
+  },
+  {
+    "template_id": "medium_013",
+    "difficulty": "medium",
+    "tables_used": [
+      "departments",
+      "instructors"
+    ],
+    "query_type": "aggregate_group",
+    "bangla_question": "প্রতিটি বিভাগে কতজন শিক্ষক আছেন তা দেখাও।",
+    "sql_query": "SELECT d.dept_name, COUNT(i.instructor_id) FROM departments d JOIN instructors i ON d.dept_id = i.dept_id GROUP BY d.dept_name;"
+  },
+  {
+    "template_id": "medium_014",
+    "difficulty": "medium",
+    "tables_used": [
+      "courses",
+      "enrollments"
+    ],
+    "query_type": "aggregate_group_order",
+    "bangla_question": "প্রতিটি কোর্সে কতজন শিক্ষার্থী নথিভুক্ত আছে তা অবরোহী ক্রমে দেখাও।",
+    "sql_query": "SELECT c.course_name, COUNT(e.enrollment_id) FROM courses c JOIN enrollments e ON c.course_id = e.course_id GROUP BY c.course_name ORDER BY COUNT(e.enrollment_id) DESC;"
+  },
+  {
+    "template_id": "medium_015",
+    "difficulty": "medium",
+    "tables_used": [
+      "courses",
+      "enrollments"
+    ],
+    "query_type": "aggregate_group",
+    "bangla_question": "প্রতিটি কোর্সের গড় গ্রেড পয়েন্ট হিসাব করো।",
+    "sql_query": "SELECT c.course_name, ROUND(AVG(e.grade_point), 2) FROM courses c JOIN enrollments e ON c.course_id = e.course_id GROUP BY c.course_name;"
+  },
+  {
+    "template_id": "medium_016",
+    "difficulty": "medium",
+    "tables_used": [
+      "students",
+      "enrollments"
+    ],
+    "query_type": "aggregate_group",
+    "bangla_question": "প্রতিটি শিক্ষার্থী কতটি কোর্সে নথিভুক্ত আছে তা দেখাও।",
+    "sql_query": "SELECT s.first_name, s.last_name, COUNT(e.course_id) FROM students s JOIN enrollments e ON s.student_id = e.student_id GROUP BY s.student_id;"
+  },
+  {
+    "template_id": "medium_017",
+    "difficulty": "medium",
+    "tables_used": [
+      "students",
+      "enrollments"
+    ],
+    "query_type": "aggregate_group_order",
+    "bangla_question": "সর্বোচ্চ সংখ্যক কোর্সে নথিভুক্ত শীর্ষ ৫ জন শিক্ষার্থীর নাম দাও।",
+    "sql_query": "SELECT s.first_name, s.last_name, COUNT(e.course_id) FROM students s JOIN enrollments e ON s.student_id = e.student_id GROUP BY s.student_id ORDER BY COUNT(e.course_id) DESC LIMIT 5;"
+  },
+  {
+    "template_id": "medium_018",
+    "difficulty": "medium",
+    "tables_used": [
+      "students",
+      "attendance"
+    ],
+    "query_type": "aggregate_group",
+    "bangla_question": "প্রতিটি শিক্ষার্থী কতদিন অনুপস্থিত ছিল তা হিসাব করো।",
+    "sql_query": "SELECT s.first_name, s.last_name, COUNT(a.attendance_id) FROM students s JOIN attendance a ON s.student_id = a.student_id WHERE a.status = 'Absent' GROUP BY s.student_id;"
+  },
+  {
+    "template_id": "medium_019",
+    "difficulty": "medium",
+    "tables_used": [
+      "courses",
+      "attendance"
+    ],
+    "query_type": "aggregate_group_order",
+    "bangla_question": "প্রতিটি কোর্সে কতদিন অনুপস্থিতি রেকর্ড হয়েছে তা দেখাও।",
+    "sql_query": "SELECT c.course_name, COUNT(a.attendance_id) FROM courses c JOIN attendance a ON c.course_id = a.course_id WHERE a.status = 'Absent' GROUP BY c.course_name;"
+  },
+  {
+    "template_id": "medium_020",
+    "difficulty": "medium",
+    "tables_used": [
+      "departments",
+      "students"
+    ],
+    "query_type": "aggregate_having",
+    "bangla_question": "কোন বিভাগে ৩০-এর বেশি শিক্ষার্থী আছে তা দেখাও।",
+    "sql_query": "SELECT d.dept_name, COUNT(s.student_id) FROM departments d JOIN students s ON d.dept_id = s.dept_id GROUP BY d.dept_name HAVING COUNT(s.student_id) > 30;"
+  },
+  {
+    "template_id": "medium_021",
+    "difficulty": "medium",
+    "tables_used": [
+      "courses",
+      "enrollments"
+    ],
+    "query_type": "aggregate_having",
+    "bangla_question": "কোন কোর্সের গড় গ্রেড পয়েন্ট ৩.০-এর বেশি তা দেখাও।",
+    "sql_query": "SELECT c.course_name, ROUND(AVG(e.grade_point), 2) FROM courses c JOIN enrollments e ON c.course_id = e.course_id GROUP BY c.course_name HAVING ROUND(AVG(e.grade_point), 2) > 3.0;"
+  },
+  {
+    "template_id": "medium_022",
+    "difficulty": "medium",
+    "tables_used": [
+      "students",
+      "departments",
+      "enrollments",
+      "courses"
+    ],
+    "query_type": "multi_join",
+    "bangla_question": "কম্পিউটার সায়েন্স বিভাগের শিক্ষার্থীরা কোন কোন কোর্সে A+ পেয়েছে তা দেখাও।",
+    "sql_query": "SELECT s.first_name, s.last_name, c.course_name FROM students s JOIN departments d ON s.dept_id = d.dept_id JOIN enrollments e ON s.student_id = e.student_id JOIN courses c ON e.course_id = c.course_id WHERE d.dept_name = 'Computer Science and Engineering' AND e.grade = 'A+';"
+  },
+  {
+    "template_id": "medium_023",
+    "difficulty": "medium",
+    "tables_used": [
+      "students",
+      "departments"
+    ],
+    "query_type": "join_order",
+    "bangla_question": "কম্পিউটার সায়েন্স বিভাগের শিক্ষার্থীদের নাম CGPA অবরোহী ক্রমে দাও।",
+    "sql_query": "SELECT s.first_name, s.last_name, s.cgpa FROM students s JOIN departments d ON s.dept_id = d.dept_id WHERE d.dept_name = 'Computer Science and Engineering' ORDER BY s.cgpa DESC;"
+  },
+  {
+    "template_id": "medium_024",
+    "difficulty": "medium",
+    "tables_used": [
+      "instructors",
+      "courses"
+    ],
+    "query_type": "aggregate_group",
+    "bangla_question": "প্রতিজন শিক্ষক কতটি কোর্স পড়ান তা দেখাও।",
+    "sql_query": "SELECT i.first_name, i.last_name, COUNT(c.course_id) FROM instructors i JOIN courses c ON i.instructor_id = c.instructor_id GROUP BY i.instructor_id;"
+  },
+  {
+    "template_id": "medium_025",
+    "difficulty": "medium",
+    "tables_used": [
+      "instructors",
+      "courses"
+    ],
+    "query_type": "aggregate_group_order",
+    "bangla_question": "কোন শিক্ষক সবচেয়ে বেশি কোর্স পড়ান তা দেখাও।",
+    "sql_query": "SELECT i.first_name, i.last_name, COUNT(c.course_id) FROM instructors i JOIN courses c ON i.instructor_id = c.instructor_id GROUP BY i.instructor_id ORDER BY COUNT(c.course_id) DESC LIMIT 1;"
+  },
+  {
+    "template_id": "medium_026",
+    "difficulty": "medium",
+    "tables_used": [
+      "students",
+      "enrollments"
+    ],
+    "query_type": "aggregate_sum",
+    "bangla_question": "প্রতিটি শিক্ষার্থীর মোট গ্রেড পয়েন্ট হিসাব করো।",
+    "sql_query": "SELECT s.first_name, s.last_name, SUM(e.grade_point) FROM students s JOIN enrollments e ON s.student_id = e.student_id GROUP BY s.student_id;"
+  },
+  {
+    "template_id": "medium_027",
+    "difficulty": "medium",
+    "tables_used": [
+      "courses",
+      "enrollments"
+    ],
+    "query_type": "aggregate_sum",
+    "bangla_question": "প্রতিটি কোর্সের মোট নথিভুক্ত শিক্ষার্থীর গ্রেড পয়েন্টের সমষ্টি দাও।",
+    "sql_query": "SELECT c.course_name, SUM(e.grade_point) FROM courses c JOIN enrollments e ON c.course_id = e.course_id GROUP BY c.course_name;"
+  },
+  {
+    "template_id": "medium_028",
+    "difficulty": "medium",
+    "tables_used": [
+      "departments",
+      "students"
+    ],
+    "query_type": "aggregate_max",
+    "bangla_question": "প্রতিটি বিভাগের সর্বোচ্চ CGPA কত তা দেখাও।",
+    "sql_query": "SELECT d.dept_name, MAX(s.cgpa) FROM departments d JOIN students s ON d.dept_id = s.dept_id GROUP BY d.dept_name;"
+  },
+  {
+    "template_id": "medium_029",
+    "difficulty": "medium",
+    "tables_used": [
+      "departments",
+      "students"
+    ],
+    "query_type": "aggregate_min",
+    "bangla_question": "প্রতিটি বিভাগের সর্বনিম্ন CGPA কত তা দেখাও।",
+    "sql_query": "SELECT d.dept_name, MIN(s.cgpa) FROM departments d JOIN students s ON d.dept_id = s.dept_id GROUP BY d.dept_name;"
+  },
+  {
+    "template_id": "medium_030",
+    "difficulty": "medium",
+    "tables_used": [
+      "students",
+      "attendance"
+    ],
+    "query_type": "aggregate_group_order",
+    "bangla_question": "কোন শিক্ষার্থী সবচেয়ে বেশিবার বিলম্বে উপস্থিত হয়েছে তা দেখাও।",
+    "sql_query": "SELECT s.first_name, s.last_name, COUNT(a.attendance_id) FROM students s JOIN attendance a ON s.student_id = a.student_id WHERE a.status = 'Late' GROUP BY s.student_id ORDER BY COUNT(a.attendance_id) DESC LIMIT 1;"
+  },
+  {
+    "template_id": "medium_031",
+    "difficulty": "medium",
+    "tables_used": [
+      "courses",
+      "departments",
+      "instructors"
+    ],
+    "query_type": "multi_join",
+    "bangla_question": "গণিত বিভাগের কোন শিক্ষক কোন কোর্স পড়ান তা দেখাও।",
+    "sql_query": "SELECT i.first_name, i.last_name, c.course_name FROM instructors i JOIN courses c ON i.instructor_id = c.instructor_id JOIN departments d ON i.dept_id = d.dept_id WHERE d.dept_name = 'Mathematics';"
+  },
+  {
+    "template_id": "medium_032",
+    "difficulty": "medium",
+    "tables_used": [
+      "students",
+      "enrollments",
+      "courses"
+    ],
+    "query_type": "multi_join",
+    "bangla_question": "প্রতিটি শিক্ষার্থী কোন কোন কোর্সে নথিভুক্ত আছে তা নাম ও গ্রেড সহ দেখাও।",
+    "sql_query": "SELECT s.first_name, s.last_name, c.course_name, e.grade FROM students s JOIN enrollments e ON s.student_id = e.student_id JOIN courses c ON e.course_id = c.course_id;"
+  },
+  {
+    "template_id": "medium_033",
+    "difficulty": "medium",
+    "tables_used": [
+      "students",
+      "enrollments",
+      "courses"
+    ],
+    "query_type": "multi_join_where",
+    "bangla_question": "কোন শিক্ষার্থী কোন কোর্সে F গ্রেড পেয়েছে তাদের নাম ও কোর্সের নাম দাও।",
+    "sql_query": "SELECT s.first_name, s.last_name, c.course_name FROM students s JOIN enrollments e ON s.student_id = e.student_id JOIN courses c ON e.course_id = c.course_id WHERE e.grade = 'F';"
+  },
+  {
+    "template_id": "medium_034",
+    "difficulty": "medium",
+    "tables_used": [
+      "departments",
+      "students"
+    ],
+    "query_type": "aggregate_having_order",
+    "bangla_question": "গড় CGPA ৩.৫-এর বেশি এমন বিভাগগুলো দেখাও।",
+    "sql_query": "SELECT d.dept_name, ROUND(AVG(s.cgpa), 2) FROM departments d JOIN students s ON d.dept_id = s.dept_id GROUP BY d.dept_name HAVING ROUND(AVG(s.cgpa), 2) > 3.5 ORDER BY ROUND(AVG(s.cgpa), 2) DESC;"
+  },
+  {
+    "template_id": "medium_035",
+    "difficulty": "medium",
+    "tables_used": [
+      "courses",
+      "enrollments"
+    ],
+    "query_type": "aggregate_having",
+    "bangla_question": "কোন কোর্সে ৫-এর বেশি শিক্ষার্থী নথিভুক্ত আছে তা দেখাও।",
+    "sql_query": "SELECT c.course_name, COUNT(e.enrollment_id) FROM courses c JOIN enrollments e ON c.course_id = e.course_id GROUP BY c.course_name HAVING COUNT(e.enrollment_id) > 5;"
+  },
+  {
+    "template_id": "medium_036",
+    "difficulty": "medium",
+    "tables_used": [
+      "students",
+      "departments",
+      "attendance"
+    ],
+    "query_type": "multi_join_aggregate",
+    "bangla_question": "প্রতিটি বিভাগে মোট কতদিন অনুপস্থিতি হয়েছে তা দেখাও।",
+    "sql_query": "SELECT d.dept_name, COUNT(a.attendance_id) FROM departments d JOIN students s ON d.dept_id = s.dept_id JOIN attendance a ON s.student_id = a.student_id WHERE a.status = 'Absent' GROUP BY d.dept_name;"
+  },
+  {
+    "template_id": "medium_037",
+    "difficulty": "medium",
+    "tables_used": [
+      "students",
+      "enrollments"
+    ],
+    "query_type": "aggregate_having",
+    "bangla_question": "কোন শিক্ষার্থী ৩টির বেশি কোর্সে নথিভুক্ত আছে তা দেখাও।",
+    "sql_query": "SELECT s.first_name, s.last_name, COUNT(e.course_id) FROM students s JOIN enrollments e ON s.student_id = e.student_id GROUP BY s.student_id HAVING COUNT(e.course_id) > 3;"
+  },
+  {
+    "template_id": "medium_038",
+    "difficulty": "medium",
+    "tables_used": [
+      "courses",
+      "departments"
+    ],
+    "query_type": "join_aggregate_group",
+    "bangla_question": "প্রতিটি বিভাগে কতটি কোর্স আছে তা দেখাও।",
+    "sql_query": "SELECT d.dept_name, COUNT(c.course_id) FROM departments d JOIN courses c ON d.dept_id = c.dept_id GROUP BY d.dept_name;"
+  },
+  {
+    "template_id": "medium_039",
+    "difficulty": "medium",
+    "tables_used": [
+      "students",
+      "departments",
+      "enrollments"
+    ],
+    "query_type": "multi_join_aggregate",
+    "bangla_question": "EEE বিভাগের শিক্ষার্থীদের গড় গ্রেড পয়েন্ট কত?",
+    "sql_query": "SELECT ROUND(AVG(e.grade_point), 2) FROM students s JOIN departments d ON s.dept_id = d.dept_id JOIN enrollments e ON s.student_id = e.student_id WHERE d.dept_name = 'Electrical and Electronic Engineering';"
+  },
+  {
+    "template_id": "medium_040",
+    "difficulty": "medium",
+    "tables_used": [
+      "students",
+      "enrollments",
+      "courses",
+      "departments"
+    ],
+    "query_type": "multi_join_where",
+    "bangla_question": "পদার্থবিজ্ঞান বিভাগের কোর্সে A+ পাওয়া শিক্ষার্থীদের নাম দাও।",
+    "sql_query": "SELECT DISTINCT s.first_name, s.last_name FROM students s JOIN enrollments e ON s.student_id = e.student_id JOIN courses c ON e.course_id = c.course_id JOIN departments d ON c.dept_id = d.dept_id WHERE d.dept_name = 'Physics' AND e.grade = 'A+';"
+  },
+  {
+    "template_id": "medium_041",
+    "difficulty": "medium",
+    "tables_used": [
+      "instructors",
+      "departments"
+    ],
+    "query_type": "aggregate_group_order",
+    "bangla_question": "কোন বিভাগে সবচেয়ে বেশি শিক্ষক আছেন তা দেখাও।",
+    "sql_query": "SELECT d.dept_name, COUNT(i.instructor_id) FROM departments d JOIN instructors i ON d.dept_id = i.dept_id GROUP BY d.dept_name ORDER BY COUNT(i.instructor_id) DESC LIMIT 1;"
+  },
+  {
+    "template_id": "medium_042",
+    "difficulty": "medium",
+    "tables_used": [
+      "students",
+      "attendance"
+    ],
+    "query_type": "aggregate_having",
+    "bangla_question": "কোন শিক্ষার্থী ৫-এর বেশি বার অনুপস্থিত ছিল তা দেখাও।",
+    "sql_query": "SELECT s.first_name, s.last_name, COUNT(a.attendance_id) FROM students s JOIN attendance a ON s.student_id = a.student_id WHERE a.status = 'Absent' GROUP BY s.student_id HAVING COUNT(a.attendance_id) > 5;"
+  },
+  {
+    "template_id": "medium_043",
+    "difficulty": "medium",
+    "tables_used": [
+      "courses",
+      "enrollments"
+    ],
+    "query_type": "aggregate_group_order",
+    "bangla_question": "সর্বোচ্চ গড় গ্রেড পয়েন্ট সহ কোর্সের নাম দাও।",
+    "sql_query": "SELECT c.course_name, ROUND(AVG(e.grade_point), 2) FROM courses c JOIN enrollments e ON c.course_id = e.course_id GROUP BY c.course_name ORDER BY ROUND(AVG(e.grade_point), 2) DESC LIMIT 1;"
+  },
+  {
+    "template_id": "medium_044",
+    "difficulty": "medium",
+    "tables_used": [
+      "students",
+      "departments"
+    ],
+    "query_type": "join_where_order",
+    "bangla_question": "ব্যবসায় প্রশাসন বিভাগের শিক্ষার্থীদের CGPA অবরোহী ক্রমে দেখাও।",
+    "sql_query": "SELECT s.first_name, s.last_name, s.cgpa FROM students s JOIN departments d ON s.dept_id = d.dept_id WHERE d.dept_name = 'Business Administration' ORDER BY s.cgpa DESC;"
+  },
+  {
+    "template_id": "medium_045",
+    "difficulty": "medium",
+    "tables_used": [
+      "courses",
+      "attendance"
+    ],
+    "query_type": "aggregate_group",
+    "bangla_question": "প্রতিটি কোর্সে মোট কতজন উপস্থিত ছিল তার সংখ্যা দেখাও।",
+    "sql_query": "SELECT c.course_name, COUNT(DISTINCT a.student_id) FROM courses c JOIN attendance a ON c.course_id = a.course_id WHERE a.status = 'Present' GROUP BY c.course_name;"
+  },
+  {
+    "template_id": "medium_046",
+    "difficulty": "medium",
+    "tables_used": [
+      "enrollments"
+    ],
+    "query_type": "aggregate_avg",
+    "bangla_question": "সকল শিক্ষার্থীর গড় গ্রেড পয়েন্ট কত?",
+    "sql_query": "SELECT ROUND(AVG(e.grade_point), 2) FROM enrollments e;"
+  },
+  {
+    "template_id": "medium_047",
+    "difficulty": "medium",
+    "tables_used": [
+      "students",
+      "departments",
+      "enrollments"
+    ],
+    "query_type": "multi_join_aggregate",
+    "bangla_question": "রসায়ন বিভাগের শিক্ষার্থীরা কতটি কোর্সে নথিভুক্ত আছে তার সংখ্যা দেখাও।",
+    "sql_query": "SELECT COUNT(DISTINCT e.course_id) FROM students s JOIN departments d ON s.dept_id = d.dept_id JOIN enrollments e ON s.student_id = e.student_id WHERE d.dept_name = 'Chemistry';"
+  },
+  {
+    "template_id": "medium_048",
+    "difficulty": "medium",
+    "tables_used": [
+      "courses",
+      "instructors",
+      "departments"
+    ],
+    "query_type": "multi_join",
+    "bangla_question": "ইংরেজি বিভাগের শিক্ষকরা কোন কোন কোর্স পড়ান তা দেখাও।",
+    "sql_query": "SELECT i.first_name, i.last_name, c.course_name FROM instructors i JOIN courses c ON i.instructor_id = c.instructor_id JOIN departments d ON i.dept_id = d.dept_id WHERE d.dept_name = 'English';"
+  },
+  {
+    "template_id": "medium_049",
+    "difficulty": "medium",
+    "tables_used": [
+      "students",
+      "enrollments",
+      "courses"
+    ],
+    "query_type": "multi_join_where",
+    "bangla_question": "Data Structures কোর্সে কোন শিক্ষার্থীরা নথিভুক্ত আছে তাদের নাম দাও।",
+    "sql_query": "SELECT s.first_name, s.last_name FROM students s JOIN enrollments e ON s.student_id = e.student_id JOIN courses c ON e.course_id = c.course_id WHERE c.course_name = 'Data Structures';"
+  },
+  {
+    "template_id": "medium_050",
+    "difficulty": "medium",
+    "tables_used": [
+      "departments",
+      "students",
+      "instructors"
+    ],
+    "query_type": "multi_aggregate",
+    "bangla_question": "প্রতিটি বিভাগে মোট শিক্ষার্থী ও শিক্ষকের সংখ্যা দেখাও।",
+    "sql_query": "SELECT d.dept_name, COUNT(DISTINCT s.student_id), COUNT(DISTINCT i.instructor_id) FROM departments d JOIN students s ON d.dept_id = s.dept_id JOIN instructors i ON d.dept_id = i.dept_id GROUP BY d.dept_name;"
+  },
+  {
+    "template_id": "medium_051",
+    "difficulty": "medium",
+    "tables_used": [
+      "enrollments"
+    ],
+    "query_type": "aggregate_count",
+    "bangla_question": "মোট কতটি enrollment রেকর্ড আছে তা দেখাও।",
+    "sql_query": "SELECT COUNT(*) FROM enrollments;"
+  },
+  {
+    "template_id": "medium_052",
+    "difficulty": "medium",
+    "tables_used": [
+      "students",
+      "departments"
+    ],
+    "query_type": "join_where",
+    "bangla_question": "অর্থনীতি বিভাগের শিক্ষার্থীদের মধ্যে CGPA ৩.৫-এর বেশি কারা আছে?",
+    "sql_query": "SELECT s.first_name, s.last_name, s.cgpa FROM students s JOIN departments d ON s.dept_id = d.dept_id WHERE d.dept_name = 'Economics' AND s.cgpa > 3.5;"
+  },
+  {
+    "template_id": "medium_053",
+    "difficulty": "medium",
+    "tables_used": [
+      "students",
+      "attendance",
+      "courses"
+    ],
+    "query_type": "multi_join_aggregate",
+    "bangla_question": "প্রতিটি শিক্ষার্থী প্রতিটি কোর্সে কতদিন উপস্থিত ছিল তা দেখাও।",
+    "sql_query": "SELECT s.first_name, s.last_name, c.course_name, COUNT(a.attendance_id) FROM students s JOIN attendance a ON s.student_id = a.student_id JOIN courses c ON a.course_id = c.course_id WHERE a.status = 'Present' GROUP BY s.student_id, c.course_id;"
+  },
+  {
+    "template_id": "medium_054",
+    "difficulty": "medium",
+    "tables_used": [
+      "instructors",
+      "departments"
+    ],
+    "query_type": "join_where",
+    "bangla_question": "পদার্থবিজ্ঞান বিভাগের লেকচারার কারা আছেন তাদের নাম দাও।",
+    "sql_query": "SELECT i.first_name, i.last_name FROM instructors i JOIN departments d ON i.dept_id = d.dept_id WHERE d.dept_name = 'Physics' AND i.designation = 'Lecturer';"
+  },
+  {
+    "template_id": "medium_055",
+    "difficulty": "medium",
+    "tables_used": [
+      "courses",
+      "departments"
+    ],
+    "query_type": "join_aggregate",
+    "bangla_question": "প্রতিটি বিভাগের মোট ক্রেডিট ঘণ্টা কত তা দেখাও।",
+    "sql_query": "SELECT d.dept_name, SUM(c.credits) FROM departments d JOIN courses c ON d.dept_id = c.dept_id GROUP BY d.dept_name;"
+  },
+  {
+    "template_id": "medium_056",
+    "difficulty": "medium",
+    "tables_used": [
+      "students",
+      "enrollments",
+      "courses"
+    ],
+    "query_type": "multi_join_where_order",
+    "bangla_question": "গ্রেড পয়েন্ট অনুযায়ী অবরোহী ক্রমে সাজিয়ে Algorithms কোর্সে নথিভুক্ত শিক্ষার্থীদের নাম, গ্রেড ও গ্রেড পয়েন্ট দেখাও।",
+    "sql_query": "SELECT s.first_name, s.last_name, e.grade, e.grade_point FROM students s JOIN enrollments e ON s.student_id = e.student_id JOIN courses c ON e.course_id = c.course_id WHERE c.course_name = 'Algorithms' ORDER BY e.grade_point DESC;"
+  },
+  {
+    "template_id": "medium_057",
+    "difficulty": "medium",
+    "tables_used": [
+      "students"
+    ],
+    "query_type": "aggregate_count",
+    "bangla_question": "মোট কতজন শিক্ষার্থী আছে তা দেখাও।",
+    "sql_query": "SELECT COUNT(*) FROM students;"
+  },
+  {
+    "template_id": "medium_058",
+    "difficulty": "medium",
+    "tables_used": [
+      "students",
+      "enrollments"
+    ],
+    "query_type": "aggregate_group_having",
+    "bangla_question": "কোন শিক্ষার্থীর গড় গ্রেড পয়েন্ট ৩.৫-এর বেশি তা দেখাও।",
+    "sql_query": "SELECT s.first_name, s.last_name, ROUND(AVG(e.grade_point), 2) FROM students s JOIN enrollments e ON s.student_id = e.student_id GROUP BY s.student_id HAVING ROUND(AVG(e.grade_point), 2) > 3.5;"
+  },
+  {
+    "template_id": "medium_059",
+    "difficulty": "medium",
+    "tables_used": [
+      "students",
+      "enrollments",
+      "departments"
+    ],
+    "query_type": "multi_join_aggregate",
+    "bangla_question": "প্রতিটি বিভাগের শিক্ষার্থীদের গড় গ্রেড পয়েন্ট হিসাব করো।",
+    "sql_query": "SELECT d.dept_name, ROUND(AVG(e.grade_point), 2) FROM departments d JOIN students s ON d.dept_id = s.dept_id JOIN enrollments e ON s.student_id = e.student_id GROUP BY d.dept_name;"
+  },
+  {
+    "template_id": "medium_060",
+    "difficulty": "medium",
+    "tables_used": [
+      "students",
+      "attendance",
+      "departments"
+    ],
+    "query_type": "multi_join_aggregate",
+    "bangla_question": "কোন বিভাগের শিক্ষার্থীরা সবচেয়ে বেশি উপস্থিত থাকে তা দেখাও।",
+    "sql_query": "SELECT d.dept_name, COUNT(a.attendance_id) FROM departments d JOIN students s ON d.dept_id = s.dept_id JOIN attendance a ON s.student_id = a.student_id WHERE a.status = 'Present' GROUP BY d.dept_name ORDER BY COUNT(a.attendance_id) DESC LIMIT 1;"
+  },
+  {
+    "template_id": "medium_061",
+    "difficulty": "medium",
+    "tables_used": [
+      "students"
+    ],
+    "query_type": "aggregate_count",
+    "bangla_question": "মোট কতজন শিক্ষার্থীর CGPA ৩.০-এর বেশি?",
+    "sql_query": "SELECT COUNT(*) FROM students WHERE cgpa > 3.0;"
+  },
+  {
+    "template_id": "medium_062",
+    "difficulty": "medium",
+    "tables_used": [
+      "instructors"
+    ],
+    "query_type": "aggregate_count",
+    "bangla_question": "মোট কতজন শিক্ষক আছেন?",
+    "sql_query": "SELECT COUNT(*) FROM instructors;"
+  },
+  {
+    "template_id": "medium_063",
+    "difficulty": "medium",
+    "tables_used": [
+      "courses"
+    ],
+    "query_type": "aggregate_count",
+    "bangla_question": "মোট কতটি কোর্স আছে?",
+    "sql_query": "SELECT COUNT(*) FROM courses;"
+  },
+  {
+    "template_id": "medium_064",
+    "difficulty": "medium",
+    "tables_used": [
+      "students"
+    ],
+    "query_type": "aggregate_avg",
+    "bangla_question": "সকল শিক্ষার্থীর গড় CGPA কত?",
+    "sql_query": "SELECT ROUND(AVG(cgpa), 2) FROM students;"
+  },
+  {
+    "template_id": "medium_065",
+    "difficulty": "medium",
+    "tables_used": [
+      "students"
+    ],
+    "query_type": "aggregate_max",
+    "bangla_question": "সর্বোচ্চ CGPA কত?",
+    "sql_query": "SELECT MAX(cgpa) FROM students;"
+  },
+  {
+    "template_id": "medium_066",
+    "difficulty": "medium",
+    "tables_used": [
+      "students"
+    ],
+    "query_type": "aggregate_min",
+    "bangla_question": "সর্বনিম্ন CGPA কত?",
+    "sql_query": "SELECT MIN(cgpa) FROM students;"
+  },
+  {
+    "template_id": "medium_067",
+    "difficulty": "medium",
+    "tables_used": [
+      "courses",
+      "enrollments"
+    ],
+    "query_type": "aggregate_avg",
+    "bangla_question": "'Fall 2023' সেমিস্টারের কোর্সগুলোর গড় গ্রেড পয়েন্ট কত?",
+    "sql_query": "SELECT ROUND(AVG(e.grade_point), 2) FROM courses c JOIN enrollments e ON c.course_id = e.course_id WHERE c.semester = 'Fall 2023';"
+  },
+  {
+    "template_id": "medium_068",
+    "difficulty": "medium",
+    "tables_used": [
+      "enrollments"
+    ],
+    "query_type": "aggregate_max",
+    "bangla_question": "সর্বোচ্চ গ্রেড পয়েন্ট কত?",
+    "sql_query": "SELECT MAX(grade_point) FROM enrollments;"
+  },
+  {
+    "template_id": "medium_069",
+    "difficulty": "medium",
+    "tables_used": [
+      "enrollments"
+    ],
+    "query_type": "aggregate_min",
+    "bangla_question": "সর্বনিম্ন গ্রেড পয়েন্ট কত?",
+    "sql_query": "SELECT MIN(grade_point) FROM enrollments;"
+  },
+  {
+    "template_id": "medium_070",
+    "difficulty": "medium",
+    "tables_used": [
+      "courses"
+    ],
+    "query_type": "aggregate_sum",
+    "bangla_question": "সকল কোর্সের মোট ক্রেডিট কত?",
+    "sql_query": "SELECT SUM(credits) FROM courses;"
+  },
+  {
+    "template_id": "easy_061",
+    "difficulty": "easy",
+    "tables_used": [
+      "students"
+    ],
+    "query_type": "select_distinct",
+    "bangla_question": "শিক্ষার্থীরা কোন কোন বিভাগ আইডিতে আছে তার তালিকা দাও।",
+    "sql_query": "SELECT DISTINCT dept_id FROM students;"
+  },
+  {
+    "template_id": "easy_062",
+    "difficulty": "easy",
+    "tables_used": [
+      "instructors"
+    ],
+    "query_type": "select_distinct",
+    "bangla_question": "শিক্ষকদের কী কী পদমর্যাদা আছে তা দেখাও।",
+    "sql_query": "SELECT DISTINCT designation FROM instructors;"
+  },
+  {
+    "template_id": "easy_063",
+    "difficulty": "easy",
+    "tables_used": [
+      "courses"
+    ],
+    "query_type": "select_distinct",
+    "bangla_question": "কোন কোন সেমিস্টারে কোর্স অফার করা হয়েছে তা দেখাও।",
+    "sql_query": "SELECT DISTINCT semester FROM courses;"
+  },
+  {
+    "template_id": "easy_064",
+    "difficulty": "easy",
+    "tables_used": [
+      "enrollments"
+    ],
+    "query_type": "select_distinct",
+    "bangla_question": "শিক্ষার্থীরা কোন কোন গ্রেড পেয়েছে তার তালিকা দাও।",
+    "sql_query": "SELECT DISTINCT grade FROM enrollments;"
+  },
+  {
+    "template_id": "easy_065",
+    "difficulty": "easy",
+    "tables_used": [
+      "attendance"
+    ],
+    "query_type": "select_distinct",
+    "bangla_question": "উপস্থিতির কী কী ধরন আছে তা দেখাও।",
+    "sql_query": "SELECT DISTINCT status FROM attendance;"
+  },
+  {
+    "template_id": "medium_071",
+    "difficulty": "medium",
+    "tables_used": [
+      "students",
+      "departments"
+    ],
+    "query_type": "join_where",
+    "bangla_question": "ইংরেজি বিভাগের শিক্ষার্থীদের নাম দাও।",
+    "sql_query": "SELECT s.first_name, s.last_name FROM students s JOIN departments d ON s.dept_id = d.dept_id WHERE d.dept_name = 'English';"
+  },
+  {
+    "template_id": "medium_072",
+    "difficulty": "medium",
+    "tables_used": [
+      "students",
+      "departments"
+    ],
+    "query_type": "join_where",
+    "bangla_question": "রসায়ন বিভাগের শিক্ষার্থীদের নাম ও CGPA দাও।",
+    "sql_query": "SELECT s.first_name, s.last_name, s.cgpa FROM students s JOIN departments d ON s.dept_id = d.dept_id WHERE d.dept_name = 'Chemistry';"
+  },
+  {
+    "template_id": "medium_073",
+    "difficulty": "medium",
+    "tables_used": [
+      "instructors",
+      "departments"
+    ],
+    "query_type": "join_where",
+    "bangla_question": "কম্পিউটার সায়েন্স বিভাগের শিক্ষকদের নাম ও পদমর্যাদা দাও।",
+    "sql_query": "SELECT i.first_name, i.last_name, i.designation FROM instructors i JOIN departments d ON i.dept_id = d.dept_id WHERE d.dept_name = 'Computer Science and Engineering';"
+  },
+  {
+    "template_id": "medium_074",
+    "difficulty": "medium",
+    "tables_used": [
+      "instructors",
+      "departments"
+    ],
+    "query_type": "join_where",
+    "bangla_question": "ইইই বিভাগের শিক্ষকদের নাম ও ইমেইল দাও।",
+    "sql_query": "SELECT i.first_name, i.last_name, i.email FROM instructors i JOIN departments d ON i.dept_id = d.dept_id WHERE d.dept_name = 'Electrical and Electronic Engineering';"
+  },
+  {
+    "template_id": "medium_075",
+    "difficulty": "medium",
+    "tables_used": [
+      "courses",
+      "departments"
+    ],
+    "query_type": "join_where",
+    "bangla_question": "গণিত বিভাগের কোর্সগুলোর নাম দাও।",
+    "sql_query": "SELECT c.course_name FROM courses c JOIN departments d ON c.dept_id = d.dept_id WHERE d.dept_name = 'Mathematics';"
+  },
+  {
+    "template_id": "medium_076",
+    "difficulty": "medium",
+    "tables_used": [
+      "courses",
+      "departments"
+    ],
+    "query_type": "join_where",
+    "bangla_question": "কম্পিউটার সায়েন্স বিভাগের কোর্সগুলোর নাম ও ক্রেডিট দাও।",
+    "sql_query": "SELECT c.course_name, c.credits FROM courses c JOIN departments d ON c.dept_id = d.dept_id WHERE d.dept_name = 'Computer Science and Engineering';"
+  },
+  {
+    "template_id": "medium_077",
+    "difficulty": "medium",
+    "tables_used": [
+      "courses",
+      "instructors"
+    ],
+    "query_type": "join_where",
+    "bangla_question": "প্রফেসরদের পড়ানো কোর্সগুলোর নাম দাও।",
+    "sql_query": "SELECT c.course_name FROM courses c JOIN instructors i ON c.instructor_id = i.instructor_id WHERE i.designation = 'Professor';"
+  },
+  {
+    "template_id": "medium_078",
+    "difficulty": "medium",
+    "tables_used": [
+      "students",
+      "enrollments",
+      "courses"
+    ],
+    "query_type": "multi_join",
+    "bangla_question": "শিক্ষার্থীদের নাম ও তাদের নথিভুক্ত কোর্সের নাম দাও।",
+    "sql_query": "SELECT s.first_name, s.last_name, c.course_name FROM students s JOIN enrollments e ON s.student_id = e.student_id JOIN courses c ON e.course_id = c.course_id;"
+  },
+  {
+    "template_id": "medium_079",
+    "difficulty": "medium",
+    "tables_used": [
+      "students",
+      "attendance",
+      "courses"
+    ],
+    "query_type": "multi_join_where",
+    "bangla_question": "কোন শিক্ষার্থীরা কোন কোর্সে কোন তারিখে অনুপস্থিত ছিল তা দেখাও।",
+    "sql_query": "SELECT s.first_name, s.last_name, c.course_name, a.date FROM students s JOIN attendance a ON s.student_id = a.student_id JOIN courses c ON a.course_id = c.course_id WHERE a.status = 'Absent';"
+  },
+  {
+    "template_id": "medium_080",
+    "difficulty": "medium",
+    "tables_used": [
+      "students",
+      "departments"
+    ],
+    "query_type": "aggregate_group",
+    "bangla_question": "প্রতিটি বিভাগের গড় CGPA কত?",
+    "sql_query": "SELECT d.dept_name, ROUND(AVG(s.cgpa), 2) FROM departments d JOIN students s ON d.dept_id = s.dept_id GROUP BY d.dept_name;"
+  },
+  {
+    "template_id": "medium_081",
+    "difficulty": "medium",
+    "tables_used": [
+      "courses",
+      "enrollments"
+    ],
+    "query_type": "aggregate_group",
+    "bangla_question": "প্রতিটি কোর্সে কতজন শিক্ষার্থী নথিভুক্ত আছে?",
+    "sql_query": "SELECT c.course_name, COUNT(e.enrollment_id) FROM courses c JOIN enrollments e ON c.course_id = e.course_id GROUP BY c.course_name;"
+  },
+  {
+    "template_id": "medium_082",
+    "difficulty": "medium",
+    "tables_used": [
+      "departments",
+      "instructors"
+    ],
+    "query_type": "aggregate_having",
+    "bangla_question": "কোন বিভাগে ৫-এর বেশি শিক্ষক আছেন?",
+    "sql_query": "SELECT d.dept_name, COUNT(i.instructor_id) FROM departments d JOIN instructors i ON d.dept_id = i.dept_id GROUP BY d.dept_name HAVING COUNT(i.instructor_id) > 5;"
+  },
+  {
+    "template_id": "medium_083",
+    "difficulty": "medium",
+    "tables_used": [
+      "students",
+      "enrollments"
+    ],
+    "query_type": "aggregate_having",
+    "bangla_question": "কোন শিক্ষার্থীর গড় গ্রেড পয়েন্ট ৩.০-এর কম তা দেখাও।",
+    "sql_query": "SELECT s.first_name, s.last_name, ROUND(AVG(e.grade_point), 2) FROM students s JOIN enrollments e ON s.student_id = e.student_id GROUP BY s.student_id HAVING ROUND(AVG(e.grade_point), 2) < 3.0;"
+  },
+  {
+    "template_id": "medium_084",
+    "difficulty": "medium",
+    "tables_used": [
+      "students",
+      "enrollments",
+      "courses"
+    ],
+    "query_type": "multi_join_aggregate",
+    "bangla_question": "প্রতিটি কোর্সে শিক্ষার্থীদের গড় CGPA কত?",
+    "sql_query": "SELECT c.course_name, ROUND(AVG(s.cgpa), 2) FROM courses c JOIN enrollments e ON c.course_id = e.course_id JOIN students s ON e.student_id = s.student_id GROUP BY c.course_name;"
+  },
+  {
+    "template_id": "medium_085",
+    "difficulty": "medium",
+    "tables_used": [
+      "students",
+      "departments"
+    ],
+    "query_type": "join_where",
+    "bangla_question": "গণিত বিভাগের যেসব শিক্ষার্থীর CGPA ৩.০-এর বেশি তাদের নাম দাও।",
+    "sql_query": "SELECT s.first_name, s.last_name FROM students s JOIN departments d ON s.dept_id = d.dept_id WHERE d.dept_name = 'Mathematics' AND s.cgpa > 3.0;"
+  },
+  {
+    "template_id": "medium_086",
+    "difficulty": "medium",
+    "tables_used": [
+      "courses",
+      "instructors",
+      "departments"
+    ],
+    "query_type": "multi_join",
+    "bangla_question": "প্রতিটি কোর্সের নাম, শিক্ষকের নাম ও বিভাগের নাম দেখাও।",
+    "sql_query": "SELECT c.course_name, i.first_name, i.last_name, d.dept_name FROM courses c JOIN instructors i ON c.instructor_id = i.instructor_id JOIN departments d ON c.dept_id = d.dept_id;"
+  },
+  {
+    "template_id": "medium_087",
+    "difficulty": "medium",
+    "tables_used": [
+      "students",
+      "enrollments",
+      "courses",
+      "departments"
+    ],
+    "query_type": "multi_join_where",
+    "bangla_question": "কম্পিউটার সায়েন্স বিভাগের কোর্সে কোন শিক্ষার্থীরা নথিভুক্ত তাদের নাম দাও।",
+    "sql_query": "SELECT DISTINCT s.first_name, s.last_name FROM students s JOIN enrollments e ON s.student_id = e.student_id JOIN courses c ON e.course_id = c.course_id JOIN departments d ON c.dept_id = d.dept_id WHERE d.dept_name = 'Computer Science and Engineering';"
+  },
+  {
+    "template_id": "medium_088",
+    "difficulty": "medium",
+    "tables_used": [
+      "students",
+      "departments"
+    ],
+    "query_type": "aggregate_group_order",
+    "bangla_question": "প্রতিটি বিভাগে কতজন শিক্ষার্থী আছে তা শিক্ষার্থী সংখ্যার অবরোহী ক্রমে দেখাও।",
+    "sql_query": "SELECT d.dept_name, COUNT(s.student_id) FROM departments d JOIN students s ON d.dept_id = s.dept_id GROUP BY d.dept_name ORDER BY COUNT(s.student_id) DESC;"
+  },
+  {
+    "template_id": "medium_089",
+    "difficulty": "medium",
+    "tables_used": [
+      "instructors",
+      "courses"
+    ],
+    "query_type": "join_where",
+    "bangla_question": "কোন শিক্ষক 'Spring 2024' সেমিস্টারে কোর্স পড়ান?",
+    "sql_query": "SELECT DISTINCT i.first_name, i.last_name FROM instructors i JOIN courses c ON i.instructor_id = c.instructor_id WHERE c.semester = 'Spring 2024';"
+  },
+  {
+    "template_id": "medium_090",
+    "difficulty": "medium",
+    "tables_used": [
+      "departments",
+      "students",
+      "enrollments"
+    ],
+    "query_type": "aggregate_sum",
+    "bangla_question": "প্রতিটি বিভাগের শিক্ষার্থীরা মোট কত গ্রেড পয়েন্ট পেয়েছে?",
+    "sql_query": "SELECT d.dept_name, SUM(e.grade_point) FROM departments d JOIN students s ON d.dept_id = s.dept_id JOIN enrollments e ON s.student_id = e.student_id GROUP BY d.dept_name;"
+  },
+  {
+    "template_id": "medium_091",
+    "difficulty": "medium",
+    "tables_used": [
+      "courses",
+      "enrollments"
+    ],
+    "query_type": "aggregate_group_order",
+    "bangla_question": "কোন কোর্সে সবচেয়ে বেশি শিক্ষার্থী নথিভুক্ত তা দেখাও।",
+    "sql_query": "SELECT c.course_name, COUNT(e.enrollment_id) FROM courses c JOIN enrollments e ON c.course_id = e.course_id GROUP BY c.course_name ORDER BY COUNT(e.enrollment_id) DESC LIMIT 1;"
+  },
+  {
+    "template_id": "medium_092",
+    "difficulty": "medium",
+    "tables_used": [
+      "departments",
+      "students"
+    ],
+    "query_type": "aggregate_max",
+    "bangla_question": "কোন বিভাগে সর্বোচ্চ CGPA আছে এবং তা কত?",
+    "sql_query": "SELECT d.dept_name, MAX(s.cgpa) FROM departments d JOIN students s ON d.dept_id = s.dept_id GROUP BY d.dept_name ORDER BY MAX(s.cgpa) DESC LIMIT 1;"
+  },
+  {
+    "template_id": "medium_093",
+    "difficulty": "medium",
+    "tables_used": [
+      "students",
+      "enrollments",
+      "courses"
+    ],
+    "query_type": "multi_join_where",
+    "bangla_question": "যেসব শিক্ষার্থী ৪ ক্রেডিটের কোর্সে নথিভুক্ত তাদের নাম দাও।",
+    "sql_query": "SELECT DISTINCT s.first_name, s.last_name FROM students s JOIN enrollments e ON s.student_id = e.student_id JOIN courses c ON e.course_id = c.course_id WHERE c.credits = 4;"
+  },
+  {
+    "template_id": "medium_094",
+    "difficulty": "medium",
+    "tables_used": [
+      "students",
+      "departments",
+      "enrollments"
+    ],
+    "query_type": "multi_join_aggregate",
+    "bangla_question": "প্রতিটি বিভাগের শিক্ষার্থীরা মোট কতটি কোর্সে নথিভুক্ত?",
+    "sql_query": "SELECT d.dept_name, COUNT(DISTINCT e.course_id) FROM departments d JOIN students s ON d.dept_id = s.dept_id JOIN enrollments e ON s.student_id = e.student_id GROUP BY d.dept_name;"
+  },
+  {
+    "template_id": "medium_095",
+    "difficulty": "medium",
+    "tables_used": [
+      "students",
+      "departments"
+    ],
+    "query_type": "join_where_order",
+    "bangla_question": "পদার্থবিজ্ঞান বিভাগের শিক্ষার্থীদের CGPA অবরোহী ক্রমে দেখাও।",
+    "sql_query": "SELECT s.first_name, s.last_name, s.cgpa FROM students s JOIN departments d ON s.dept_id = d.dept_id WHERE d.dept_name = 'Physics' ORDER BY s.cgpa DESC;"
+  },
+  {
+    "template_id": "medium_096",
+    "difficulty": "medium",
+    "tables_used": [
+      "instructors",
+      "departments"
+    ],
+    "query_type": "join_where_order",
+    "bangla_question": "গণিত বিভাগের শিক্ষকদের যোগদানের বছর অনুযায়ী সাজাও।",
+    "sql_query": "SELECT i.first_name, i.last_name, i.joining_year FROM instructors i JOIN departments d ON i.dept_id = d.dept_id WHERE d.dept_name = 'Mathematics' ORDER BY i.joining_year ASC;"
+  },
+  {
+    "template_id": "medium_097",
+    "difficulty": "medium",
+    "tables_used": [
+      "students",
+      "enrollments",
+      "courses"
+    ],
+    "query_type": "multi_join_where_order",
+    "bangla_question": "Database Systems কোর্সে নথিভুক্ত শিক্ষার্থীদের গ্রেড পয়েন্ট অবরোহী ক্রমে দেখাও।",
+    "sql_query": "SELECT s.first_name, s.last_name, e.grade_point FROM students s JOIN enrollments e ON s.student_id = e.student_id JOIN courses c ON e.course_id = c.course_id WHERE c.course_name = 'Database Systems' ORDER BY e.grade_point DESC;"
+  },
+  {
+    "template_id": "medium_098",
+    "difficulty": "medium",
+    "tables_used": [
+      "courses",
+      "departments"
+    ],
+    "query_type": "aggregate_group_order",
+    "bangla_question": "প্রতিটি বিভাগের মোট ক্রেডিট ঘণ্টা অবরোহী ক্রমে দেখাও।",
+    "sql_query": "SELECT d.dept_name, SUM(c.credits) FROM departments d JOIN courses c ON d.dept_id = c.dept_id GROUP BY d.dept_name ORDER BY SUM(c.credits) DESC;"
+  },
+  {
+    "template_id": "medium_099",
+    "difficulty": "medium",
+    "tables_used": [
+      "students",
+      "attendance"
+    ],
+    "query_type": "aggregate_group_order",
+    "bangla_question": "কোন শিক্ষার্থী সবচেয়ে বেশি দিন উপস্থিত ছিল তা দেখাও।",
+    "sql_query": "SELECT s.first_name, s.last_name, COUNT(a.attendance_id) FROM students s JOIN attendance a ON s.student_id = a.student_id WHERE a.status = 'Present' GROUP BY s.student_id ORDER BY COUNT(a.attendance_id) DESC LIMIT 1;"
+  },
+  {
+    "template_id": "medium_100",
+    "difficulty": "medium",
+    "tables_used": [
+      "departments",
+      "students"
+    ],
+    "query_type": "aggregate_having",
+    "bangla_question": "কোন বিভাগের গড় CGPA ৩.০-এর বেশি তা দেখাও।",
+    "sql_query": "SELECT d.dept_name, ROUND(AVG(s.cgpa), 2) FROM departments d JOIN students s ON d.dept_id = s.dept_id GROUP BY d.dept_name HAVING ROUND(AVG(s.cgpa), 2) > 3.0;"
+  },
+  {
+    "template_id": "easy_066",
+    "difficulty": "easy",
+    "tables_used": [
+      "students"
+    ],
+    "query_type": "limit",
+    "bangla_question": "যেকোনো ৫ জন শিক্ষার্থীর নাম ও CGPA দাও।",
+    "sql_query": "SELECT first_name, last_name, cgpa FROM students LIMIT 5;"
+  },
+  {
+    "template_id": "easy_067",
+    "difficulty": "easy",
+    "tables_used": [
+      "courses"
+    ],
+    "query_type": "limit",
+    "bangla_question": "প্রথম ৫টি কোর্সের নাম ও ক্রেডিট দাও।",
+    "sql_query": "SELECT course_name, credits FROM courses LIMIT 5;"
+  },
+  {
+    "template_id": "easy_068",
+    "difficulty": "easy",
+    "tables_used": [
+      "departments"
+    ],
+    "query_type": "limit",
+    "bangla_question": "যেকোনো ৩টি বিভাগের নাম ও ভবন দাও।",
+    "sql_query": "SELECT dept_name, building FROM departments LIMIT 3;"
+  },
+  {
+    "template_id": "easy_069",
+    "difficulty": "easy",
+    "tables_used": [
+      "enrollments"
+    ],
+    "query_type": "limit",
+    "bangla_question": "যেকোনো ৫টি enrollment-এর তথ্য দাও।",
+    "sql_query": "SELECT * FROM enrollments LIMIT 5;"
+  },
+  {
+    "template_id": "easy_070",
+    "difficulty": "easy",
+    "tables_used": [
+      "instructors"
+    ],
+    "query_type": "limit",
+    "bangla_question": "প্রথম ৩ জন শিক্ষকের নাম ও ইমেইল দাও।",
+    "sql_query": "SELECT first_name, last_name, email FROM instructors LIMIT 3;"
+  },
+  {
+    "template_id": "easy_071",
+    "difficulty": "easy",
+    "tables_used": [
+      "departments"
+    ],
+    "query_type": "order_by",
+    "bangla_question": "বিভাগগুলোর নাম ও ভবন বর্ণানুক্রমে সাজিয়ে দাও।",
+    "sql_query": "SELECT dept_name, building FROM departments ORDER BY dept_name ASC;"
+  },
+  {
+    "template_id": "easy_072",
+    "difficulty": "easy",
+    "tables_used": [
+      "enrollments"
+    ],
+    "query_type": "order_by",
+    "bangla_question": "enrollment গুলো গ্রেড পয়েন্ট অনুযায়ী অবরোহী ক্রমে সাজাও।",
+    "sql_query": "SELECT enrollment_id, student_id, grade_point FROM enrollments ORDER BY grade_point DESC;"
+  },
+  {
+    "template_id": "easy_073",
+    "difficulty": "easy",
+    "tables_used": [
+      "courses"
+    ],
+    "query_type": "order_by",
+    "bangla_question": "কোর্সগুলোর কোড ও নাম বর্ণানুক্রমে সাজাও।",
+    "sql_query": "SELECT course_code, course_name FROM courses ORDER BY course_name ASC;"
+  },
+  {
+    "template_id": "easy_074",
+    "difficulty": "easy",
+    "tables_used": [
+      "enrollments"
+    ],
+    "query_type": "order_by_limit",
+    "bangla_question": "সবচেয়ে বেশি গ্রেড পয়েন্ট পাওয়া ৫টি enrollment দেখাও।",
+    "sql_query": "SELECT enrollment_id, student_id, grade_point FROM enrollments ORDER BY grade_point DESC LIMIT 5;"
+  },
+  {
+    "template_id": "easy_075",
+    "difficulty": "easy",
+    "tables_used": [
+      "instructors"
+    ],
+    "query_type": "order_by_limit",
+    "bangla_question": "সবচেয়ে নতুন যোগ দেওয়া ৩ জন শিক্ষকের নাম দাও।",
+    "sql_query": "SELECT first_name, last_name, joining_year FROM instructors ORDER BY joining_year DESC LIMIT 3;"
+  },
+  {
+    "template_id": "easy_076",
+    "difficulty": "easy",
+    "tables_used": [
+      "courses"
+    ],
+    "query_type": "order_by_limit",
+    "bangla_question": "সবচেয়ে বেশি ক্রেডিটের ৫টি কোর্সের নাম দাও।",
+    "sql_query": "SELECT course_name, credits FROM courses ORDER BY credits DESC LIMIT 5;"
+  },
+  {
+    "template_id": "easy_077",
+    "difficulty": "easy",
+    "tables_used": [
+      "instructors"
+    ],
+    "query_type": "order_by_limit",
+    "bangla_question": "সবচেয়ে পুরনো ৩ জন শিক্ষকের নাম ও যোগদানের বছর দাও।",
+    "sql_query": "SELECT first_name, last_name, joining_year FROM instructors ORDER BY joining_year ASC LIMIT 3;"
+  },
+  {
+    "template_id": "easy_078",
+    "difficulty": "easy",
+    "tables_used": [
+      "enrollments"
+    ],
+    "query_type": "order_by_limit",
+    "bangla_question": "সর্বনিম্ন গ্রেড পয়েন্ট সহ ৫টি enrollment দেখাও।",
+    "sql_query": "SELECT enrollment_id, student_id, grade_point FROM enrollments ORDER BY grade_point ASC LIMIT 5;"
+  },
+  {
+    "template_id": "easy_079",
+    "difficulty": "easy",
+    "tables_used": [
+      "instructors"
+    ],
+    "query_type": "select_column",
+    "bangla_question": "সকল শিক্ষকের ইমেইল দাও।",
+    "sql_query": "SELECT email FROM instructors;"
+  },
+  {
+    "template_id": "easy_080",
+    "difficulty": "easy",
+    "tables_used": [
+      "departments"
+    ],
+    "query_type": "select_column",
+    "bangla_question": "সকল বিভাগের নাম ও ফোন নম্বর দাও।",
+    "sql_query": "SELECT dept_name, phone FROM departments;"
+  },
+  {
+    "template_id": "easy_081",
+    "difficulty": "easy",
+    "tables_used": [
+      "students"
+    ],
+    "query_type": "select_column",
+    "bangla_question": "সকল শিক্ষার্থীর ইমেইল ও ভর্তির বছর দাও।",
+    "sql_query": "SELECT email, year_of_admission FROM students;"
+  },
+  {
+    "template_id": "easy_082",
+    "difficulty": "easy",
+    "tables_used": [
+      "courses"
+    ],
+    "query_type": "select_column",
+    "bangla_question": "সকল কোর্সের কোড ও সেমিস্টার দাও।",
+    "sql_query": "SELECT course_code, semester FROM courses;"
+  },
+  {
+    "template_id": "easy_083",
+    "difficulty": "easy",
+    "tables_used": [
+      "students"
+    ],
+    "query_type": "select_distinct",
+    "bangla_question": "শিক্ষার্থীরা কোন কোন বছরে ভর্তি হয়েছে তার তালিকা দাও।",
+    "sql_query": "SELECT DISTINCT year_of_admission FROM students;"
+  },
+  {
+    "template_id": "easy_084",
+    "difficulty": "easy",
+    "tables_used": [
+      "courses"
+    ],
+    "query_type": "select_distinct",
+    "bangla_question": "কোর্সগুলোর কোন কোন ক্রেডিট মান আছে তা দেখাও।",
+    "sql_query": "SELECT DISTINCT credits FROM courses;"
+  },
+  {
+    "template_id": "easy_085",
+    "difficulty": "easy",
+    "tables_used": [
+      "attendance"
+    ],
+    "query_type": "select_all",
+    "bangla_question": "সকল উপস্থিতির রেকর্ড দাও।",
+    "sql_query": "SELECT * FROM attendance;"
+  },
+  {
+    "template_id": "medium_101",
+    "difficulty": "medium",
+    "tables_used": [
+      "courses",
+      "departments"
+    ],
+    "query_type": "join",
+    "bangla_question": "প্রতিটি কোর্সের নাম ও সেই কোর্সের বিভাগের নাম দাও।",
+    "sql_query": "SELECT c.course_name, d.dept_name FROM courses c JOIN departments d ON c.dept_id = d.dept_id;"
+  },
+  {
+    "template_id": "medium_102",
+    "difficulty": "medium",
+    "tables_used": [
+      "students",
+      "attendance"
+    ],
+    "query_type": "join",
+    "bangla_question": "প্রতিটি উপস্থিতির রেকর্ডে শিক্ষার্থীর নাম, তারিখ ও অবস্থা দাও।",
+    "sql_query": "SELECT s.first_name, s.last_name, a.date, a.status FROM students s JOIN attendance a ON s.student_id = a.student_id;"
+  },
+  {
+    "template_id": "medium_103",
+    "difficulty": "medium",
+    "tables_used": [
+      "students",
+      "enrollments",
+      "courses"
+    ],
+    "query_type": "multi_join",
+    "bangla_question": "প্রতিটি শিক্ষার্থীর নাম, কোর্সের নাম ও গ্রেড পয়েন্ট দাও।",
+    "sql_query": "SELECT s.first_name, s.last_name, c.course_name, e.grade_point FROM students s JOIN enrollments e ON s.student_id = e.student_id JOIN courses c ON e.course_id = c.course_id;"
+  },
+  {
+    "template_id": "medium_104",
+    "difficulty": "medium",
+    "tables_used": [
+      "students",
+      "attendance",
+      "courses"
+    ],
+    "query_type": "multi_join",
+    "bangla_question": "প্রতিটি উপস্থিতির রেকর্ডে শিক্ষার্থীর নাম ও কোর্সের নাম দাও।",
+    "sql_query": "SELECT s.first_name, s.last_name, c.course_name, a.status FROM students s JOIN attendance a ON s.student_id = a.student_id JOIN courses c ON a.course_id = c.course_id;"
+  },
+  {
+    "template_id": "medium_105",
+    "difficulty": "medium",
+    "tables_used": [
+      "instructors",
+      "departments",
+      "courses"
+    ],
+    "query_type": "multi_join",
+    "bangla_question": "প্রতিটি শিক্ষকের নাম, বিভাগের নাম ও তাদের পড়ানো কোর্সের নাম দাও।",
+    "sql_query": "SELECT i.first_name, i.last_name, d.dept_name, c.course_name FROM instructors i JOIN departments d ON i.dept_id = d.dept_id JOIN courses c ON c.instructor_id = i.instructor_id;"
+  },
+  {
+    "template_id": "medium_106",
+    "difficulty": "medium",
+    "tables_used": [
+      "students",
+      "enrollments",
+      "courses"
+    ],
+    "query_type": "multi_join_where",
+    "bangla_question": "'Fall 2023' সেমিস্টারের কোর্সে নথিভুক্ত শিক্ষার্থীদের নাম দাও।",
+    "sql_query": "SELECT s.first_name, s.last_name, c.course_name FROM students s JOIN enrollments e ON s.student_id = e.student_id JOIN courses c ON e.course_id = c.course_id WHERE c.semester = 'Fall 2023';"
+  },
+  {
+    "template_id": "medium_107",
+    "difficulty": "medium",
+    "tables_used": [
+      "students",
+      "enrollments",
+      "courses"
+    ],
+    "query_type": "multi_join_where",
+    "bangla_question": "৪ ক্রেডিটের কোর্সে নথিভুক্ত শিক্ষার্থীদের নাম দাও।",
+    "sql_query": "SELECT s.first_name, s.last_name, c.course_name FROM students s JOIN enrollments e ON s.student_id = e.student_id JOIN courses c ON e.course_id = c.course_id WHERE c.credits = 4;"
+  },
+  {
+    "template_id": "medium_108",
+    "difficulty": "medium",
+    "tables_used": [
+      "students",
+      "enrollments",
+      "courses"
+    ],
+    "query_type": "multi_join_where",
+    "bangla_question": "A+ পাওয়া শিক্ষার্থীদের নাম ও কোর্সের নাম দাও।",
+    "sql_query": "SELECT s.first_name, s.last_name, c.course_name FROM students s JOIN enrollments e ON s.student_id = e.student_id JOIN courses c ON e.course_id = c.course_id WHERE e.grade = 'A+';"
+  },
+  {
+    "template_id": "medium_109",
+    "difficulty": "medium",
+    "tables_used": [
+      "students",
+      "attendance",
+      "courses"
+    ],
+    "query_type": "multi_join_where",
+    "bangla_question": "অনুপস্থিত ছিল এমন শিক্ষার্থীদের নাম ও কোর্সের নাম দাও।",
+    "sql_query": "SELECT s.first_name, s.last_name, c.course_name FROM students s JOIN attendance a ON s.student_id = a.student_id JOIN courses c ON a.course_id = c.course_id WHERE a.status = 'Absent';"
+  },
+  {
+    "template_id": "medium_110",
+    "difficulty": "medium",
+    "tables_used": [
+      "students",
+      "enrollments",
+      "courses"
+    ],
+    "query_type": "multi_join_where_order",
+    "bangla_question": "গ্রেড পয়েন্ট অনুযায়ী অবরোহী ক্রমে সাজিয়ে ৩.৫-এর বেশি গ্রেড পয়েন্ট পাওয়া শিক্ষার্থীদের নাম, কোর্সের নাম ও গ্রেড পয়েন্ট দাও।",
+    "sql_query": "SELECT s.first_name, s.last_name, c.course_name, e.grade_point FROM students s JOIN enrollments e ON s.student_id = e.student_id JOIN courses c ON e.course_id = c.course_id WHERE e.grade_point > 3.5 ORDER BY e.grade_point DESC;"
+  },
+  {
+    "template_id": "medium_111",
+    "difficulty": "medium",
+    "tables_used": [
+      "students",
+      "enrollments",
+      "courses"
+    ],
+    "query_type": "multi_join_where_order",
+    "bangla_question": "'Spring 2024' সেমিস্টারের কোর্সে নথিভুক্ত শিক্ষার্থীদের নাম বর্ণানুক্রমে দাও।",
+    "sql_query": "SELECT s.first_name, s.last_name, c.course_name FROM students s JOIN enrollments e ON s.student_id = e.student_id JOIN courses c ON e.course_id = c.course_id WHERE c.semester = 'Spring 2024' ORDER BY s.first_name ASC;"
+  },
+  {
+    "template_id": "medium_112",
+    "difficulty": "medium",
+    "tables_used": [
+      "students",
+      "enrollments",
+      "courses"
+    ],
+    "query_type": "multi_join_where_order",
+    "bangla_question": "৪ ক্রেডিটের কোর্সে নথিভুক্ত শিক্ষার্থীদের নাম ও গ্রেড পয়েন্ট অবরোহী ক্রমে দাও।",
+    "sql_query": "SELECT s.first_name, s.last_name, e.grade_point FROM students s JOIN enrollments e ON s.student_id = e.student_id JOIN courses c ON e.course_id = c.course_id WHERE c.credits = 4 ORDER BY e.grade_point DESC;"
+  },
+  {
+    "template_id": "medium_113",
+    "difficulty": "medium",
+    "tables_used": [
+      "students",
+      "attendance",
+      "courses"
+    ],
+    "query_type": "multi_join_where_order",
+    "bangla_question": "তারিখ অনুযায়ী সাজিয়ে উপস্থিত ছিল এমন শিক্ষার্থীদের নাম, কোর্সের নাম ও তারিখ দাও।",
+    "sql_query": "SELECT s.first_name, s.last_name, c.course_name, a.date FROM students s JOIN attendance a ON s.student_id = a.student_id JOIN courses c ON a.course_id = c.course_id WHERE a.status = 'Present' ORDER BY a.date ASC;"
+  },
+  {
+    "template_id": "medium_114",
+    "difficulty": "medium",
+    "tables_used": [
+      "courses"
+    ],
+    "query_type": "aggregate_avg",
+    "bangla_question": "সকল কোর্সের গড় ক্রেডিট কত?",
+    "sql_query": "SELECT ROUND(AVG(credits), 2) FROM courses;"
+  },
+  {
+    "template_id": "medium_115",
+    "difficulty": "medium",
+    "tables_used": [
+      "students",
+      "departments"
+    ],
+    "query_type": "aggregate_avg",
+    "bangla_question": "কম্পিউটার সায়েন্স বিভাগের শিক্ষার্থীদের গড় CGPA কত?",
+    "sql_query": "SELECT ROUND(AVG(s.cgpa), 2) FROM students s JOIN departments d ON s.dept_id = d.dept_id WHERE d.dept_name = 'Computer Science and Engineering';"
+  },
+  {
+    "template_id": "medium_116",
+    "difficulty": "medium",
+    "tables_used": [
+      "courses",
+      "enrollments"
+    ],
+    "query_type": "aggregate_avg",
+    "bangla_question": "৪ ক্রেডিটের কোর্সগুলোর গড় গ্রেড পয়েন্ট কত?",
+    "sql_query": "SELECT ROUND(AVG(e.grade_point), 2) FROM courses c JOIN enrollments e ON c.course_id = e.course_id WHERE c.credits = 4;"
+  },
+  {
+    "template_id": "medium_117",
+    "difficulty": "medium",
+    "tables_used": [
+      "courses"
+    ],
+    "query_type": "aggregate_max",
+    "bangla_question": "সর্বোচ্চ ক্রেডিট কত?",
+    "sql_query": "SELECT MAX(credits) FROM courses;"
+  },
+  {
+    "template_id": "medium_118",
+    "difficulty": "medium",
+    "tables_used": [
+      "instructors"
+    ],
+    "query_type": "aggregate_max",
+    "bangla_question": "সবচেয়ে সাম্প্রতিক যোগদানের বছর কত?",
+    "sql_query": "SELECT MAX(joining_year) FROM instructors;"
+  },
+  {
+    "template_id": "medium_119",
+    "difficulty": "medium",
+    "tables_used": [
+      "students"
+    ],
+    "query_type": "aggregate_max",
+    "bangla_question": "শিক্ষার্থীদের সর্বোচ্চ ভর্তির বছর কত?",
+    "sql_query": "SELECT MAX(year_of_admission) FROM students;"
+  },
+  {
+    "template_id": "medium_120",
+    "difficulty": "medium",
+    "tables_used": [
+      "students",
+      "departments"
+    ],
+    "query_type": "aggregate_max",
+    "bangla_question": "কম্পিউটার সায়েন্স বিভাগের সর্বোচ্চ CGPA কত?",
+    "sql_query": "SELECT MAX(s.cgpa) FROM students s JOIN departments d ON s.dept_id = d.dept_id WHERE d.dept_name = 'Computer Science and Engineering';"
+  },
+  {
+    "template_id": "medium_121",
+    "difficulty": "medium",
+    "tables_used": [
+      "courses"
+    ],
+    "query_type": "aggregate_min",
+    "bangla_question": "সর্বনিম্ন ক্রেডিট কত?",
+    "sql_query": "SELECT MIN(credits) FROM courses;"
+  },
+  {
+    "template_id": "medium_122",
+    "difficulty": "medium",
+    "tables_used": [
+      "instructors"
+    ],
+    "query_type": "aggregate_min",
+    "bangla_question": "সবচেয়ে পুরনো যোগদানের বছর কত?",
+    "sql_query": "SELECT MIN(joining_year) FROM instructors;"
+  },
+  {
+    "template_id": "medium_123",
+    "difficulty": "medium",
+    "tables_used": [
+      "students"
+    ],
+    "query_type": "aggregate_min",
+    "bangla_question": "শিক্ষার্থীদের সর্বনিম্ন ভর্তির বছর কত?",
+    "sql_query": "SELECT MIN(year_of_admission) FROM students;"
+  },
+  {
+    "template_id": "medium_124",
+    "difficulty": "medium",
+    "tables_used": [
+      "enrollments"
+    ],
+    "query_type": "aggregate_sum",
+    "bangla_question": "সকল enrollment-এর মোট গ্রেড পয়েন্ট কত?",
+    "sql_query": "SELECT ROUND(SUM(grade_point), 2) FROM enrollments;"
+  },
+  {
+    "template_id": "medium_125",
+    "difficulty": "medium",
+    "tables_used": [
+      "courses",
+      "departments"
+    ],
+    "query_type": "aggregate_sum",
+    "bangla_question": "গণিত বিভাগের কোর্সগুলোর মোট ক্রেডিট কত?",
+    "sql_query": "SELECT SUM(c.credits) FROM courses c JOIN departments d ON c.dept_id = d.dept_id WHERE d.dept_name = 'Mathematics';"
+  },
+  {
+    "template_id": "medium_126",
+    "difficulty": "medium",
+    "tables_used": [
+      "courses"
+    ],
+    "query_type": "aggregate_sum",
+    "bangla_question": "৪ ক্রেডিটের কোর্সগুলোর মোট ক্রেডিট কত?",
+    "sql_query": "SELECT SUM(credits) FROM courses WHERE credits = 4;"
+  },
+  {
+    "template_id": "medium_127",
+    "difficulty": "medium",
+    "tables_used": [
+      "departments"
+    ],
+    "query_type": "aggregate_count",
+    "bangla_question": "মোট কতটি বিভাগ আছে?",
+    "sql_query": "SELECT COUNT(*) FROM departments;"
+  },
+  {
+    "template_id": "medium_128",
+    "difficulty": "medium",
+    "tables_used": [
+      "attendance"
+    ],
+    "query_type": "aggregate_count",
+    "bangla_question": "মোট কতটি উপস্থিতির রেকর্ড আছে?",
+    "sql_query": "SELECT COUNT(*) FROM attendance;"
+  },
+  {
+    "template_id": "medium_129",
+    "difficulty": "medium",
+    "tables_used": [
+      "courses"
+    ],
+    "query_type": "aggregate_group",
+    "bangla_question": "প্রতিটি সেমিস্টারে কতটি কোর্স আছে?",
+    "sql_query": "SELECT semester, COUNT(*) FROM courses GROUP BY semester;"
+  },
+  {
+    "template_id": "medium_130",
+    "difficulty": "medium",
+    "tables_used": [
+      "instructors"
+    ],
+    "query_type": "aggregate_group",
+    "bangla_question": "প্রতিটি পদমর্যাদায় কতজন শিক্ষক আছেন?",
+    "sql_query": "SELECT designation, COUNT(*) FROM instructors GROUP BY designation;"
+  },
+  {
+    "template_id": "medium_131",
+    "difficulty": "medium",
+    "tables_used": [
+      "courses",
+      "departments"
+    ],
+    "query_type": "join_where_order",
+    "bangla_question": "কম্পিউটার সায়েন্স বিভাগের কোর্সগুলো ক্রেডিট অনুযায়ী অবরোহী ক্রমে দাও।",
+    "sql_query": "SELECT c.course_name, c.credits FROM courses c JOIN departments d ON c.dept_id = d.dept_id WHERE d.dept_name = 'Computer Science and Engineering' ORDER BY c.credits DESC;"
+  },
+  {
+    "template_id": "medium_132",
+    "difficulty": "medium",
+    "tables_used": [
+      "instructors",
+      "departments"
+    ],
+    "query_type": "join_where_order",
+    "bangla_question": "পদার্থবিজ্ঞান বিভাগের শিক্ষকদের নাম বর্ণানুক্রমে সাজিয়ে দাও।",
+    "sql_query": "SELECT i.first_name, i.last_name FROM instructors i JOIN departments d ON i.dept_id = d.dept_id WHERE d.dept_name = 'Physics' ORDER BY i.first_name ASC;"
+  },
+  {
+    "template_id": "medium_133",
+    "difficulty": "medium",
+    "tables_used": [
+      "courses",
+      "departments"
+    ],
+    "query_type": "join_where_order",
+    "bangla_question": "ইংরেজি বিভাগের কোর্সগুলোর নাম ও ক্রেডিট বর্ণানুক্রমে সাজিয়ে দাও।",
+    "sql_query": "SELECT c.course_name, c.credits FROM courses c JOIN departments d ON c.dept_id = d.dept_id WHERE d.dept_name = 'English' ORDER BY c.course_name ASC;"
+  },
+  {
+    "template_id": "medium_134",
+    "difficulty": "medium",
+    "tables_used": [
+      "courses"
+    ],
+    "query_type": "aggregate_having",
+    "bangla_question": "কোন সেমিস্টারে ৫টির বেশি কোর্স আছে তা দেখাও।",
+    "sql_query": "SELECT semester, COUNT(*) FROM courses GROUP BY semester HAVING COUNT(*) > 5;"
+  },
+  {
+    "template_id": "medium_135",
+    "difficulty": "medium",
+    "tables_used": [
+      "instructors"
+    ],
+    "query_type": "aggregate_having",
+    "bangla_question": "কোন পদমর্যাদায় ১০ জনের বেশি শিক্ষক আছেন তা দেখাও।",
+    "sql_query": "SELECT designation, COUNT(*) FROM instructors GROUP BY designation HAVING COUNT(*) > 10;"
+  },
+  {
+    "template_id": "easy_086",
+    "difficulty": "easy",
+    "tables_used": [
+      "instructors"
+    ],
+    "query_type": "order_by",
+    "bangla_question": "শিক্ষকদের নাম ও ইমেইল বর্ণানুক্রমে সাজিয়ে দাও।",
+    "sql_query": "SELECT first_name, last_name, email FROM instructors ORDER BY first_name ASC;"
+  },
+  {
+    "template_id": "easy_087",
+    "difficulty": "easy",
+    "tables_used": [
+      "students"
+    ],
+    "query_type": "order_by",
+    "bangla_question": "CGPA অনুযায়ী আরোহী ক্রমে সাজিয়ে শিক্ষার্থীদের নাম ও ইমেইল দাও।",
+    "sql_query": "SELECT first_name, last_name, email FROM students ORDER BY cgpa ASC;"
+  },
+  {
+    "template_id": "easy_088",
+    "difficulty": "easy",
+    "tables_used": [
+      "departments"
+    ],
+    "query_type": "select_column",
+    "bangla_question": "সকল বিভাগের ফোন নম্বর দাও।",
+    "sql_query": "SELECT phone FROM departments;"
+  },
+  {
+    "template_id": "easy_089",
+    "difficulty": "easy",
+    "tables_used": [
+      "courses"
+    ],
+    "query_type": "select_distinct",
+    "bangla_question": "কোর্সগুলো কোন কোন সেমিস্টার ও ক্রেডিটে আছে তা দেখাও।",
+    "sql_query": "SELECT DISTINCT semester, credits FROM courses;"
+  },
+  {
+    "template_id": "medium_136",
+    "difficulty": "medium",
+    "tables_used": [
+      "enrollments",
+      "courses"
+    ],
+    "query_type": "join",
+    "bangla_question": "প্রতিটি enrollment-এ কোর্সের নাম ও গ্রেড দাও।",
+    "sql_query": "SELECT c.course_name, e.grade FROM enrollments e JOIN courses c ON e.course_id = c.course_id;"
+  },
+  {
+    "template_id": "medium_137",
+    "difficulty": "medium",
+    "tables_used": [
+      "attendance",
+      "courses"
+    ],
+    "query_type": "join",
+    "bangla_question": "প্রতিটি উপস্থিতির রেকর্ডে কোর্সের নাম, তারিখ ও অবস্থা দাও।",
+    "sql_query": "SELECT c.course_name, a.date, a.status FROM attendance a JOIN courses c ON a.course_id = c.course_id;"
+  },
+  {
+    "template_id": "medium_138",
+    "difficulty": "medium",
+    "tables_used": [
+      "students",
+      "enrollments",
+      "courses"
+    ],
+    "query_type": "multi_join",
+    "bangla_question": "প্রতিটি শিক্ষার্থীর নাম, কোর্সের কোড ও গ্রেড দাও।",
+    "sql_query": "SELECT s.first_name, s.last_name, c.course_code, e.grade FROM students s JOIN enrollments e ON s.student_id = e.student_id JOIN courses c ON e.course_id = c.course_id;"
+  },
+  {
+    "template_id": "medium_139",
+    "difficulty": "medium",
+    "tables_used": [
+      "students"
+    ],
+    "query_type": "aggregate_count",
+    "bangla_question": "কতজন শিক্ষার্থীর CGPA ৩.৭৫-এর বেশি?",
+    "sql_query": "SELECT COUNT(*) FROM students WHERE cgpa > 3.75;"
+  },
+  {
+    "template_id": "easy_090",
+    "difficulty": "easy",
+    "tables_used": [
+      "courses"
+    ],
+    "query_type": "select_column",
+    "bangla_question": "Introduction to Programming নামের কোর্সের কোড কত?",
+    "sql_query": "SELECT course_code FROM courses WHERE course_name = 'Introduction to Programming';"
+  },
+  {
+    "template_id": "easy_091",
+    "difficulty": "easy",
+    "tables_used": [
+      "courses"
+    ],
+    "query_type": "select_column",
+    "bangla_question": "CSE102 কোডের কোর্সের নাম কী?",
+    "sql_query": "SELECT course_name FROM courses WHERE course_code = 'CSE102';"
+  },
+  {
+    "template_id": "easy_092",
+    "difficulty": "easy",
+    "tables_used": [
+      "courses"
+    ],
+    "query_type": "select_column",
+    "bangla_question": "Data Structures কোর্সের ক্রেডিট কত?",
+    "sql_query": "SELECT credits FROM courses WHERE course_name = 'Data Structures';"
+  },
+  {
+    "template_id": "easy_093",
+    "difficulty": "easy",
+    "tables_used": [
+      "courses"
+    ],
+    "query_type": "select_where",
+    "bangla_question": "Algorithms কোর্সের কোড ও সেমিস্টার দাও।",
+    "sql_query": "SELECT course_code, semester FROM courses WHERE course_name = 'Algorithms';"
+  },
+  {
+    "template_id": "easy_094",
+    "difficulty": "easy",
+    "tables_used": [
+      "students"
+    ],
+    "query_type": "select_column",
+    "bangla_question": "Ayesha Ahmed নামের শিক্ষার্থীর ইমেইল দাও।",
+    "sql_query": "SELECT email FROM students WHERE first_name = 'Ayesha' AND last_name = 'Ahmed';"
+  },
+  {
+    "template_id": "easy_095",
+    "difficulty": "easy",
+    "tables_used": [
+      "students"
+    ],
+    "query_type": "select_column",
+    "bangla_question": "Rahim Ahmed নামের শিক্ষার্থীর CGPA কত?",
+    "sql_query": "SELECT cgpa FROM students WHERE first_name = 'Rahim' AND last_name = 'Ahmed';"
+  },
+  {
+    "template_id": "easy_096",
+    "difficulty": "easy",
+    "tables_used": [
+      "instructors"
+    ],
+    "query_type": "select_where",
+    "bangla_question": "Arif Akter নামের শিক্ষকের ইমেইল ও পদমর্যাদা দাও।",
+    "sql_query": "SELECT email, designation FROM instructors WHERE first_name = 'Arif' AND last_name = 'Akter';"
+  },
+  {
+    "template_id": "easy_097",
+    "difficulty": "easy",
+    "tables_used": [
+      "students"
+    ],
+    "query_type": "select_where",
+    "bangla_question": "শিক্ষার্থী আইডি ১০-এর নাম ও CGPA দাও।",
+    "sql_query": "SELECT first_name, last_name, cgpa FROM students WHERE student_id = 10;"
+  },
+  {
+    "template_id": "easy_098",
+    "difficulty": "easy",
+    "tables_used": [
+      "courses"
+    ],
+    "query_type": "select_where",
+    "bangla_question": "কোর্স আইডি ৫-এর নাম ও ক্রেডিট দাও।",
+    "sql_query": "SELECT course_name, credits FROM courses WHERE course_id = 5;"
+  },
+  {
+    "template_id": "easy_099",
+    "difficulty": "easy",
+    "tables_used": [
+      "students"
+    ],
+    "query_type": "select_where",
+    "bangla_question": "Ayesha নামের শিক্ষার্থীদের ইমেইল দাও।",
+    "sql_query": "SELECT email FROM students WHERE first_name = 'Ayesha';"
+  },
+  {
+    "template_id": "medium_140",
+    "difficulty": "medium",
+    "tables_used": [
+      "courses",
+      "instructors"
+    ],
+    "query_type": "join_where",
+    "bangla_question": "Introduction to Programming কোর্সটি কোন শিক্ষক পড়ান?",
+    "sql_query": "SELECT i.first_name, i.last_name FROM instructors i JOIN courses c ON i.instructor_id = c.instructor_id WHERE c.course_name = 'Introduction to Programming';"
+  },
+  {
+    "template_id": "medium_141",
+    "difficulty": "medium",
+    "tables_used": [
+      "students",
+      "enrollments",
+      "courses"
+    ],
+    "query_type": "multi_join_where",
+    "bangla_question": "Ayesha Ahmed কোন কোন কোর্সে নথিভুক্ত?",
+    "sql_query": "SELECT c.course_name FROM students s JOIN enrollments e ON s.student_id = e.student_id JOIN courses c ON e.course_id = c.course_id WHERE s.first_name = 'Ayesha' AND s.last_name = 'Ahmed';"
+  },
+  {
+    "template_id": "medium_142",
+    "difficulty": "medium",
+    "tables_used": [
+      "courses",
+      "departments"
+    ],
+    "query_type": "join_where",
+    "bangla_question": "Data Structures কোর্সটি কোন বিভাগের?",
+    "sql_query": "SELECT d.dept_name FROM departments d JOIN courses c ON d.dept_id = c.dept_id WHERE c.course_name = 'Data Structures';"
+  }
+]

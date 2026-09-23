@@ -160,16 +160,78 @@ def is_decoding_artifact(sql: str) -> bool:
     return has_duplicate_select_columns(sql) or has_orphan_sort_direction(sql)
 
 
-def pick_executable(candidates: list[str], con: sqlite3.Connection) -> str:
+def tables_in(sql: str) -> frozenset:
+    """The tables a query reads, from its FROM and JOIN clauses."""
+    return frozenset(re.findall(r"(?:from|join) (\w+)", normalize_sql(sql)))
+
+
+#: The Bangla word that names each column, for the column check in `over_projects`.
+#: Hand-written, then verified: it vetoes none of the 2,170 gold queries in any split.
+#: first_name and course_name are absent on purpose — both are just নাম in Bangla, so
+#: a question can never distinguish them and neither can be checked this way.
+COLUMN_CUES = {
+    "credits":           ["ক্রেডিট"],
+    "email":             ["ইমেইল", "মেইল"],
+    "phone":             ["ফোন", "মোবাইল"],
+    "building":          ["ভবন", "বিল্ডিং"],
+    "designation":       ["পদবি", "পদবী", "পদ"],
+    "joining_year":      ["যোগদান", "যোগ দেওয়া"],
+    "year_of_admission": ["ভর্তি"],
+    "semester":          ["সেমিস্টার"],
+    "date":              ["তারিখ"],
+    "status":            ["উপস্থিত", "অনুপস্থিত", "স্ট্যাটাস", "বিলম্ব"],
+    "course_code":       ["কোড"],
+    "grade_point":       ["পয়েন্ট"],
+    "cgpa":              ["সিজিপিএ", "CGPA", "cgpa"],
+}
+
+_SELECT_LIST = re.compile(r"\s*SELECT\s+(?:DISTINCT\s+)?(.*?)\s+FROM", re.IGNORECASE | re.DOTALL)
+
+
+def over_projects(question: str, sql: str) -> bool:
+    """True if the SELECT list returns a column the question never asks for.
+
+    The table head fixes *which tables* a query reads but not *which columns* it returns:
+    asked for "কোর্সের নাম", a beam returning `course_name, credits` reads the right table
+    and still answers a different question. This rejects it — `credits` is only returned
+    when the question says ক্রেডিট.
+    """
+    match = _SELECT_LIST.match(sql)
+    if not match:
+        return False
+    select_list = match.group(1)
+    return any(re.search(rf"\b{column}\b", select_list) and not any(c in question for c in cues)
+               for column, cues in COLUMN_CUES.items())
+
+
+def pick_executable(candidates: list[str], con: sqlite3.Connection,
+                    preferred_tables: frozenset | None = None,
+                    question: str | None = None) -> str:
     """Execution-guided decoding (Wang et al., 2018): first beam that runs without error.
 
     Beams arrive in model-score order, so the model's ranking is kept among valid
     queries and only overridden when a higher-scoring query cannot execute or is a
     recognisable artifact. Preference order: executes and is not an artifact, then
     merely executes, then the top beam.
+
+    Two optional filters narrow the choice further, each falling back when it would leave
+    nothing, so neither can ever leave a question without an answer:
+
+    `question`          the column check — beams returning a column the question never
+                        mentions are skipped (over_projects)
+    `preferred_tables`  the table head's prediction (table_head.predict_tables) — the first
+                        remaining beam reading exactly those tables wins, which is what
+                        lets a `wrong_table` beam, one that runs and so passes every other
+                        check, be skipped
     """
     executable = [sql for sql in candidates if run_sql(con, sql)[1] is None]
-    for sql in executable:
-        if not is_decoding_artifact(sql):
-            return sql
+    clean = [sql for sql in executable if not is_decoding_artifact(sql)]
+    if question is not None:
+        clean = [sql for sql in clean if not over_projects(question, sql)] or clean
+    if preferred_tables:
+        for sql in clean:
+            if tables_in(sql) == preferred_tables:
+                return sql
+    if clean:
+        return clean[0]
     return executable[0] if executable else candidates[0]

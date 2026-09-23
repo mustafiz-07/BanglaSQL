@@ -30,6 +30,7 @@ correct but written with a different alias or column order.
 | 6 | patience 5→10, orphan ASC/DESC rejection, run-on phrasing repair | 54.6% | 34.8% | 90.9% |
 | 7 | **dataset rebuilt** — 13 question/SQL errors fixed, database repopulated, every loophole closed | 55.0% | **50.4%** | 85.2% |
 | 8 | আগে/পরে polarity rule, aggregate aliases removed, target length 128→160 | **59.6%** | 51.1% | **96.0%** |
+| 8 + constrained fallback | inference only: schema-constrained decoding where no beam executes | 59.6% | 51.1% | **98.2%** |
 
 **Headline numbers are only comparable from run 4 onward.** Runs 0→4 each rebuilt the
 test set, so the exec-accuracy column above tracks four different test sets. Runs 3 and
@@ -1069,12 +1070,55 @@ phenomenon seen from the projection side.
 whose table was never joined (`e.grade`, `c.course_name`, `e.course_id`). Replayed through
 the schema grammar, **13 of 13** are caught — all by EOS gating on an unbound alias.
 
-### Note on the constrained-decoding ablation
+### Model contribution — schema-constrained decoding (branch `model_contribution`)
 
-The first ablation run returned byte-identical predictions for both arms. That was a
-wiring bug, not a result: `evaluate.py` built no decoder, so `--constrained` changed only
-a label in the output file. Fixed, and `evaluate.py` now aborts if the constraint never
-restricts a step. See `constrained_decoding.md`.
+Runs 1–8 changed data, never the model. This adds an inference-time contribution: generation
+is masked at every step so that only schema-valid continuations are reachable (table name
+after `FROM`/`JOIN`, columns of the right table after `c.`, and no end-of-sequence while an
+alias is still unbound). Code: `schema_grammar.py`, `constrained_decode.py`; design and
+verification in `constrained_decoding.md`. No retraining — the ablation reuses the run 8
+checkpoint, so weights, data and seed are identical across arms.
+
+**Ablation on the run 8 checkpoint (327 test examples, 4 beams):**
+
+| arm | validity | exec. acc. | exact match | malformed SQL |
+|---|---|---|---|---|
+| baseline (execution-guided reranking) | 96.0% | 59.6% | 51.1% | 13 |
+| constrained everywhere | **98.2%** | 56.9% | 50.5% | **6** |
+| constrained only where no beam executes | **98.2%** | 59.6% | 51.1% | **6** |
+
+- **Constraining every question costs 2.8 points.** Reranking had been using invalidity as a
+  free correctness signal — it fell through malformed top beams to a correct lower one. The
+  constraint makes those beams valid-but-wrong, so reranking stops at them (it fired on 27
+  baseline examples vs 15 constrained; all 10 regressions are valid-but-wrong queries).
+- **Fallback mode keeps the signal:** generate unconstrained, re-generate with the constraint
+  only for the 13 questions where no beam executes. Validity +2.1 at zero accuracy cost.
+- **Honest limit:** of those 13, 7 became valid and none became correct. The constraint
+  repairs scope errors, but on this checkpoint they co-occur with semantic ones. Claim:
+  *guarantees schema validity; does not, here, improve correctness.*
+- The test set's 34 templates give a ±0.17 CI, so the −2.8 is directional evidence, not a
+  proven loss. Validity and `malformed_sql` counts are the direct, measurable claim.
+
+**Process notes, so the numbers can be trusted:**
+
+- The first Colab ablation returned byte-identical predictions for both arms: `evaluate.py`
+  built no decoder, so `--constrained` only changed a label. Fixed, and `evaluate.py` now
+  aborts if the constraint never restricts a step.
+- A code review then found the EOS gate was bypassed whenever the state was an identifier
+  position (`SELECT c.course_name FROM courses` could end with `c` unbound). Fixed, and all
+  arms were re-run. **The headline numbers did not move** (98.2 / 56.9 / 6 malformed before
+  and after); only `aggregate` component accuracy for the constrained arm shifted
+  (67.9% → 67.0%). The re-run also confirmed the gate fires: 47,741 EOS-blocked steps of
+  174,620, and 0 fail-opens.
+- Two grammar bugs were caught by replaying the 228 gold queries before any GPU time
+  (SentencePiece `▁` stripping blocked 186; `joining_year` read as `JOIN` blocked 9). After
+  the fixes the grammar blocks 0 of 228.
+- The local baseline reproduced the Colab run 8 result to four decimals, so any delta is
+  attributable to the decoder alone.
+
+Reproduce: `python run_ablation.py --model <checkpoint>` locally, or
+[colab_demo.ipynb](colab_demo.ipynb) on Colab (loads the checkpoint from Drive,
+rebuilds the data and checks the test-set hash against run 8's).
 
 ---
 
@@ -1084,7 +1128,7 @@ restricts a step. See `constrained_decoding.md`.
 python create_database.py    # deterministic (seed 42) — same DB every time
 python build_dataset.py      # deterministic — same splits every time
 python preprocess_check.py   # tokenizer coverage + sequence-length profiling
-python train.py              # GPU required; use colab_train.ipynb
+python train.py              # GPU required; use colab_demo.ipynb
 python evaluate.py           # writes logs/test_results.json + test_predictions.json
 ```
 

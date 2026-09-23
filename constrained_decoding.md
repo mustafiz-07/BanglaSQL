@@ -139,6 +139,8 @@ accuracy drop. They are the reason the force-decode gate is phase 3's exit crite
 
 ## Result (run 8 checkpoint, 327 test examples)
 
+*Re-run after the EOS-gate fix from code review (the gate had been bypassed at identifier positions): headline numbers are unchanged, so the figures below stand. The only value that moved is the constrained arm's `aggregate` component (67.9% → 67.0%); wall times are from the earlier run.*
+
 The local baseline reproduced the Colab run to four decimal places — 0.5963 / 0.5107 /
 0.9602 with identical failure categories — so the database, splits and checkpoint all
 match and any delta is attributable to the decoder alone.

@@ -35,8 +35,10 @@ import torch
 from transformers import AutoTokenizer, AutoModelForSeq2SeqLM
 
 from common import (
-    format_input, is_decoding_artifact, load_config, open_readonly_db, run_sql,
+    format_input, is_decoding_artifact, load_config, open_readonly_db, over_projects, run_sql,
+    tables_in,
 )
+from table_head import load_head, predict_tables
 
 # Point at a checkpoint elsewhere without editing the file — the trained model is often
 # unzipped beside the repo rather than into checkpoints/.
@@ -64,6 +66,12 @@ def load_model():
     model = AutoModelForSeq2SeqLM.from_pretrained(MODEL_DIR)
     model.eval()
     return tokenizer, model
+
+
+@st.cache_resource
+def load_table_head():
+    """The auxiliary table head saved with the checkpoint, or None if it has none."""
+    return load_head(MODEL_DIR)
 
 
 @st.cache_resource
@@ -142,16 +150,29 @@ def executable_ranks(candidates: list[str], tables: dict) -> list[int]:
         con.close()
 
 
-def choose_sql(candidates: list[str], tables: dict) -> tuple[str, int]:
+def choose_sql(candidates: list[str], tables: dict,
+               preferred_tables: frozenset | None = None,
+               question: str | None = None) -> tuple[str, int]:
     """Execution-guided choice (Wang et al., 2018): the best beam that actually runs.
 
     Beams arrive in model-score order, so the model's own ranking is kept among queries
     that execute, and is overridden only when a higher-scoring one fails to run or is a
     recognisable decoding artifact. Returns (sql, rank) so the UI can say when a lower
     beam was used.
+
+    `question` enables the column check (beams returning a column the question never
+    mentions are skipped); `preferred_tables` is the table head's prediction, and the first
+    remaining beam reading exactly those tables wins. Same rules, in the same order, as
+    common.pick_executable, so the app and evaluate.py choose identically.
     """
     usable = executable_ranks(candidates, tables)
     clean = [r for r in usable if not is_decoding_artifact(candidates[r])]
+    if question is not None:
+        clean = [r for r in clean if not over_projects(question, candidates[r])] or clean
+    if preferred_tables:
+        for r in clean:
+            if tables_in(candidates[r]) == preferred_tables:
+                return candidates[r], r
     if clean:
         return candidates[clean[0]], clean[0]
     if usable:
@@ -230,14 +251,18 @@ def main():
             candidates = generate_candidates(tokenizer, model, question, config,
                                              decoder=decoder)
 
-        sql, rank = choose_sql(candidates, tables)
+        head = load_table_head()
+        predicted = (predict_tables(model, head, tokenizer, [question], config)[0]
+                     if head is not None else None)
+        sql, rank = choose_sql(candidates, tables, predicted, question)
 
     st.code(sql, language="sql")
 
     notes.insert(0, f"জেনারেশন সময়: {time.time() - start:.2f} সেকেন্ড")
+    if predicted is not None:
+        notes.append("প্রত্যাশিত টেবিল: " + (", ".join(sorted(predicted)) or "—"))
     if rank > 0:
-        notes.append("শীর্ষ কোয়েরিটি চালানো যায়নি — "
-                     f"{rank + 1} নম্বর বিকল্পটি নেওয়া হয়েছে")
+        notes.append(f"{rank + 1} নম্বর বিকল্পটি নেওয়া হয়েছে")
     st.caption(" · ".join(notes))
 
     if show_candidates:
@@ -245,8 +270,11 @@ def main():
             runs = set(executable_ranks(candidates, tables))
             for i, candidate in enumerate(candidates):
                 status = "✅ চলে" if i in runs else "❌ চলে না"
+                match = ""
+                if predicted is not None:
+                    match = " · টেবিল মেলে" if tables_in(candidate) == predicted else " · টেবিল মেলে না"
                 chosen = " ← নির্বাচিত" if candidate == sql else ""
-                st.text(f"{i + 1}. [{status}]{chosen}")
+                st.text(f"{i + 1}. [{status}{match}]{chosen}")
                 st.code(candidate, language="sql")
 
     error = validate_sql(sql, tables)
