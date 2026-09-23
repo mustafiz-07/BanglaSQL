@@ -2428,5 +2428,139 @@
     "query_type": "aggregate_count",
     "bangla_question": "কতজন শিক্ষার্থীর CGPA ৩.৭৫-এর বেশি?",
     "sql_query": "SELECT COUNT(*) FROM students WHERE cgpa > 3.75;"
+  },
+  {
+    "template_id": "easy_090",
+    "difficulty": "easy",
+    "tables_used": [
+      "courses"
+    ],
+    "query_type": "select_column",
+    "bangla_question": "Introduction to Programming নামের কোর্সের কোড কত?",
+    "sql_query": "SELECT course_code FROM courses WHERE course_name = 'Introduction to Programming';"
+  },
+  {
+    "template_id": "easy_091",
+    "difficulty": "easy",
+    "tables_used": [
+      "courses"
+    ],
+    "query_type": "select_column",
+    "bangla_question": "CSE102 কোডের কোর্সের নাম কী?",
+    "sql_query": "SELECT course_name FROM courses WHERE course_code = 'CSE102';"
+  },
+  {
+    "template_id": "easy_092",
+    "difficulty": "easy",
+    "tables_used": [
+      "courses"
+    ],
+    "query_type": "select_column",
+    "bangla_question": "Data Structures কোর্সের ক্রেডিট কত?",
+    "sql_query": "SELECT credits FROM courses WHERE course_name = 'Data Structures';"
+  },
+  {
+    "template_id": "easy_093",
+    "difficulty": "easy",
+    "tables_used": [
+      "courses"
+    ],
+    "query_type": "select_where",
+    "bangla_question": "Algorithms কোর্সের কোড ও সেমিস্টার দাও।",
+    "sql_query": "SELECT course_code, semester FROM courses WHERE course_name = 'Algorithms';"
+  },
+  {
+    "template_id": "easy_094",
+    "difficulty": "easy",
+    "tables_used": [
+      "students"
+    ],
+    "query_type": "select_column",
+    "bangla_question": "Ayesha Ahmed নামের শিক্ষার্থীর ইমেইল দাও।",
+    "sql_query": "SELECT email FROM students WHERE first_name = 'Ayesha' AND last_name = 'Ahmed';"
+  },
+  {
+    "template_id": "easy_095",
+    "difficulty": "easy",
+    "tables_used": [
+      "students"
+    ],
+    "query_type": "select_column",
+    "bangla_question": "Rahim Ahmed নামের শিক্ষার্থীর CGPA কত?",
+    "sql_query": "SELECT cgpa FROM students WHERE first_name = 'Rahim' AND last_name = 'Ahmed';"
+  },
+  {
+    "template_id": "easy_096",
+    "difficulty": "easy",
+    "tables_used": [
+      "instructors"
+    ],
+    "query_type": "select_where",
+    "bangla_question": "Arif Akter নামের শিক্ষকের ইমেইল ও পদমর্যাদা দাও।",
+    "sql_query": "SELECT email, designation FROM instructors WHERE first_name = 'Arif' AND last_name = 'Akter';"
+  },
+  {
+    "template_id": "easy_097",
+    "difficulty": "easy",
+    "tables_used": [
+      "students"
+    ],
+    "query_type": "select_where",
+    "bangla_question": "শিক্ষার্থী আইডি ১০-এর নাম ও CGPA দাও।",
+    "sql_query": "SELECT first_name, last_name, cgpa FROM students WHERE student_id = 10;"
+  },
+  {
+    "template_id": "easy_098",
+    "difficulty": "easy",
+    "tables_used": [
+      "courses"
+    ],
+    "query_type": "select_where",
+    "bangla_question": "কোর্স আইডি ৫-এর নাম ও ক্রেডিট দাও।",
+    "sql_query": "SELECT course_name, credits FROM courses WHERE course_id = 5;"
+  },
+  {
+    "template_id": "easy_099",
+    "difficulty": "easy",
+    "tables_used": [
+      "students"
+    ],
+    "query_type": "select_where",
+    "bangla_question": "Ayesha নামের শিক্ষার্থীদের ইমেইল দাও।",
+    "sql_query": "SELECT email FROM students WHERE first_name = 'Ayesha';"
+  },
+  {
+    "template_id": "medium_140",
+    "difficulty": "medium",
+    "tables_used": [
+      "courses",
+      "instructors"
+    ],
+    "query_type": "join_where",
+    "bangla_question": "Introduction to Programming কোর্সটি কোন শিক্ষক পড়ান?",
+    "sql_query": "SELECT i.first_name, i.last_name FROM instructors i JOIN courses c ON i.instructor_id = c.instructor_id WHERE c.course_name = 'Introduction to Programming';"
+  },
+  {
+    "template_id": "medium_141",
+    "difficulty": "medium",
+    "tables_used": [
+      "students",
+      "enrollments",
+      "courses"
+    ],
+    "query_type": "multi_join_where",
+    "bangla_question": "Ayesha Ahmed কোন কোন কোর্সে নথিভুক্ত?",
+    "sql_query": "SELECT c.course_name FROM students s JOIN enrollments e ON s.student_id = e.student_id JOIN courses c ON e.course_id = c.course_id WHERE s.first_name = 'Ayesha' AND s.last_name = 'Ahmed';"
+  },
+  {
+    "template_id": "medium_142",
+    "difficulty": "medium",
+    "tables_used": [
+      "courses",
+      "departments"
+    ],
+    "query_type": "join_where",
+    "bangla_question": "Data Structures কোর্সটি কোন বিভাগের?",
+    "sql_query": "SELECT d.dept_name FROM departments d JOIN courses c ON d.dept_id = c.dept_id WHERE c.course_name = 'Data Structures';"
   }
 ]
